@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 // Gemini API key is now server-side only (no VITE_ prefix)
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1/models';
 
 interface GeminiRequest {
     action: 'chat' | 'analyze-food' | 'calculate-nutrition' | 'generate-meal-plan' | 'generate-recipes';
