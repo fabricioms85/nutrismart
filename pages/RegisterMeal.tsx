@@ -69,6 +69,62 @@ const RegisterMeal: React.FC<RegisterMealProps> = ({ onSave, onUpdate, history =
     setManualTime(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
   };
 
+  // Helper function to compress image if too large
+  const compressImage = (file: File, maxSizeKB: number = 1024): Promise<{ base64: string; mimeType: string }> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          // Calculate dimensions maintaining aspect ratio
+          let { width, height } = img;
+          const maxDimension = 1280; // Max width or height
+
+          if (width > maxDimension || height > maxDimension) {
+            if (width > height) {
+              height = (height / width) * maxDimension;
+              width = maxDimension;
+            } else {
+              width = (width / height) * maxDimension;
+              height = maxDimension;
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            reject(new Error('Could not get canvas context'));
+            return;
+          }
+
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // Compress with quality reduction if needed
+          let quality = 0.8;
+          let dataUrl = canvas.toDataURL('image/jpeg', quality);
+
+          // If still too large, reduce quality further
+          while (dataUrl.length > maxSizeKB * 1024 * 1.37 && quality > 0.3) {
+            quality -= 0.1;
+            dataUrl = canvas.toDataURL('image/jpeg', quality);
+          }
+
+          resolve({
+            base64: dataUrl.split(',')[1],
+            mimeType: 'image/jpeg'
+          });
+        };
+        img.onerror = () => reject(new Error('Failed to load image'));
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -81,47 +137,81 @@ const RegisterMeal: React.FC<RegisterMealProps> = ({ onSave, onUpdate, history =
     setEditingId(null); // Ensure we are creating new unless explicitly editing
 
     try {
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64String = reader.result as string;
-        const base64Data = base64String.split(',')[1];
-        const mimeType = file.type;
+      // Detect MIME type - fallback for cameras that don't provide it
+      let mimeType = file.type;
+      if (!mimeType || mimeType === '') {
+        // Detect from file name extension
+        const ext = file.name.split('.').pop()?.toLowerCase();
+        const mimeMap: Record<string, string> = {
+          'jpg': 'image/jpeg',
+          'jpeg': 'image/jpeg',
+          'png': 'image/png',
+          'gif': 'image/gif',
+          'webp': 'image/webp',
+          'heic': 'image/heic',
+          'heif': 'image/heif'
+        };
+        mimeType = mimeMap[ext || ''] || 'image/jpeg'; // Default to JPEG
+      }
 
-        try {
-          const analysis = await analyzeFoodImage(base64Data, mimeType);
+      // Compress image if it's large (camera photos can be 5-10MB)
+      const fileSizeKB = file.size / 1024;
+      let base64Data: string;
+      let finalMimeType: string;
 
-          if (analysis) {
-            setMealData(prev => ({
-              ...prev,
-              name: analysis.name,
-              calories: analysis.calories.toString(),
-              protein: analysis.protein.toString(),
-              carbs: analysis.carbs.toString(),
-              fats: analysis.fats.toString(),
-              weight: analysis.weight.toString(),
+      if (fileSizeKB > 1500) {
+        // Compress large images
+        console.log(`Compressing image from ${fileSizeKB.toFixed(0)}KB`);
+        const compressed = await compressImage(file);
+        base64Data = compressed.base64;
+        finalMimeType = compressed.mimeType;
+        console.log(`Compressed to ${(base64Data.length / 1024 * 0.75).toFixed(0)}KB`);
+      } else {
+        // Use original for smaller images
+        const reader = new FileReader();
+        const result = await new Promise<string>((resolve, reject) => {
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = () => reject(new Error('Failed to read file'));
+          reader.readAsDataURL(file);
+        });
+        base64Data = result.split(',')[1];
+        finalMimeType = mimeType;
+      }
+
+      try {
+        const analysis = await analyzeFoodImage(base64Data, finalMimeType);
+
+        if (analysis) {
+          setMealData(prev => ({
+            ...prev,
+            name: analysis.name,
+            calories: analysis.calories.toString(),
+            protein: analysis.protein.toString(),
+            carbs: analysis.carbs.toString(),
+            fats: analysis.fats.toString(),
+            weight: analysis.weight.toString(),
+          }));
+
+          // Populate ingredients list from AI analysis
+          if (analysis.ingredients && analysis.ingredients.length > 0) {
+            const items: FoodItem[] = analysis.ingredients.map((ing, idx) => ({
+              id: `ai-${Date.now()}-${idx}`,
+              name: ing.name,
+              quantity: ing.quantity,
+              unit: ing.unit
             }));
-
-            // Populate ingredients list from AI analysis
-            if (analysis.ingredients && analysis.ingredients.length > 0) {
-              const items: FoodItem[] = analysis.ingredients.map((ing, idx) => ({
-                id: `ai-${Date.now()}-${idx}`,
-                name: ing.name,
-                quantity: ing.quantity,
-                unit: ing.unit
-              }));
-              setFoodItems(items);
-            }
+            setFoodItems(items);
           }
-        } catch (error) {
-          console.error("Erro na análise:", error);
-          alert("Não foi possível analisar a imagem. Você pode preencher manualmente.");
-        } finally {
-          setIsAnalyzing(false);
         }
-      };
-      reader.readAsDataURL(file);
+      } catch (error) {
+        console.error("Erro na análise:", error);
+        alert("Não foi possível analisar a imagem. Você pode preencher manualmente.");
+      } finally {
+        setIsAnalyzing(false);
+      }
     } catch (error) {
-      console.error("Erro ao ler arquivo:", error);
+      console.error("Erro ao processar arquivo:", error);
+      alert("Erro ao processar a imagem. Tente novamente ou preencha manualmente.");
       setIsAnalyzing(false);
     }
   };
