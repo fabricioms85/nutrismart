@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Camera, Save, Plus, Loader2, Image as ImageIcon, X, PenTool, Scale, Calendar, Clock, Trash2, Calculator, History, Eye, Copy, Edit2, ChevronRight, ScanLine } from 'lucide-react';
 import { Meal } from '../types';
 import { analyzeFoodImage, calculateNutritionalInfo } from '../services/geminiService';
@@ -50,6 +50,11 @@ const RegisterMeal: React.FC<RegisterMealProps> = ({ onSave, onUpdate, history =
 
   // Barcode Scanner state
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
+
+  // Scroll to top when component mounts
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
 
   const resetForm = () => {
     setMealData({

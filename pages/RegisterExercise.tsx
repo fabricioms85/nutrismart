@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Dumbbell, 
-  Clock, 
-  Flame, 
-  Save, 
-  Sparkles, 
-  Footprints, 
-  Waves, 
-  Bike, 
-  Wind, 
-  Activity, 
-  Zap 
+import {
+  Dumbbell,
+  Clock,
+  Flame,
+  Save,
+  Sparkles,
+  Footprints,
+  Waves,
+  Bike,
+  Wind,
+  Activity,
+  Zap
 } from 'lucide-react';
 import { Exercise, User } from '../types';
 
@@ -53,6 +53,11 @@ const RegisterExercise: React.FC<RegisterExerciseProps> = ({ user, onSave }) => 
 
   const [autoCalculated, setAutoCalculated] = useState(false);
 
+  // Scroll to top when component mounts
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   // Automatic Calorie Calculation Effect
   useEffect(() => {
     const calculateCalories = () => {
@@ -75,7 +80,7 @@ const RegisterExercise: React.FC<RegisterExerciseProps> = ({ user, onSave }) => 
 
       setExerciseData(prev => ({ ...prev, calories: caloriesBurned.toString() }));
       setAutoCalculated(true);
-      
+
       // Reset indicator animation after a moment
       const timer = setTimeout(() => setAutoCalculated(false), 2000);
       return () => clearTimeout(timer);
@@ -86,7 +91,7 @@ const RegisterExercise: React.FC<RegisterExerciseProps> = ({ user, onSave }) => 
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const newExercise: Omit<Exercise, 'id'> = {
       name: exerciseData.name,
       durationMinutes: Number(exerciseData.duration) || 0,
@@ -103,9 +108,9 @@ const RegisterExercise: React.FC<RegisterExerciseProps> = ({ user, onSave }) => 
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Registrar Exercício</h1>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8">
-        
+
         <form onSubmit={handleSubmit} className="space-y-8">
-          
+
           {/* Activity Type Grid */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-3">Tipo de Atividade</label>
@@ -117,12 +122,11 @@ const RegisterExercise: React.FC<RegisterExerciseProps> = ({ user, onSave }) => 
                   <button
                     key={type}
                     type="button"
-                    onClick={() => setExerciseData({...exerciseData, name: type})}
-                    className={`flex flex-col items-center justify-center gap-2 p-3 rounded-xl border transition-all duration-200 ${
-                      isSelected
-                        ? 'border-nutri-500 bg-nutri-50 text-nutri-700 shadow-sm ring-1 ring-nutri-200' 
+                    onClick={() => setExerciseData({ ...exerciseData, name: type })}
+                    className={`flex flex-col items-center justify-center gap-2 p-3 rounded-xl border transition-all duration-200 ${isSelected
+                        ? 'border-nutri-500 bg-nutri-50 text-nutri-700 shadow-sm ring-1 ring-nutri-200'
                         : 'border-gray-200 hover:border-nutri-300 hover:bg-gray-50 text-gray-600'
-                    }`}
+                      }`}
                   >
                     <Icon size={24} className={isSelected ? 'text-nutri-600' : 'text-gray-400'} />
                     <span className="text-xs font-semibold">{type}</span>
@@ -142,7 +146,7 @@ const RegisterExercise: React.FC<RegisterExerciseProps> = ({ user, onSave }) => 
                 <input
                   type="number"
                   value={exerciseData.duration}
-                  onChange={(e) => setExerciseData({...exerciseData, duration: e.target.value})}
+                  onChange={(e) => setExerciseData({ ...exerciseData, duration: e.target.value })}
                   placeholder="Ex: 45"
                   className="w-full pl-4 pr-4 py-3 rounded-xl border border-gray-200 focus:border-nutri-500 focus:ring-2 focus:ring-nutri-100 outline-none transition text-lg"
                   required
@@ -166,13 +170,12 @@ const RegisterExercise: React.FC<RegisterExerciseProps> = ({ user, onSave }) => 
                 <input
                   type="number"
                   value={exerciseData.calories}
-                  onChange={(e) => setExerciseData({...exerciseData, calories: e.target.value})}
+                  onChange={(e) => setExerciseData({ ...exerciseData, calories: e.target.value })}
                   placeholder="0"
-                  className={`w-full px-4 py-3 rounded-xl border outline-none transition text-lg font-bold ${
-                    autoCalculated 
-                      ? 'border-nutri-400 bg-nutri-50 text-nutri-800' 
+                  className={`w-full px-4 py-3 rounded-xl border outline-none transition text-lg font-bold ${autoCalculated
+                      ? 'border-nutri-400 bg-nutri-50 text-nutri-800'
                       : 'border-gray-200 focus:border-nutri-500 focus:ring-2 focus:ring-nutri-100 text-gray-700'
-                  }`}
+                    }`}
                 />
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-gray-400">kcal</span>
               </div>
@@ -186,29 +189,30 @@ const RegisterExercise: React.FC<RegisterExerciseProps> = ({ user, onSave }) => 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-3">Intensidade do Treino</label>
             <div className="flex gap-4">
-               {['Baixa', 'Media', 'Alta'].map((level) => {
-                 const value = level.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ""); // "Média" -> "media"
-                 const isSelected = exerciseData.intensity === value;
-                 
-                 let colorClass = 'peer-checked:border-nutri-500 peer-checked:bg-nutri-50 peer-checked:text-nutri-700';
-                 if (value === 'alta') colorClass = 'peer-checked:border-red-500 peer-checked:bg-red-50 peer-checked:text-red-700';
-                 if (value === 'baixa') colorClass = 'peer-checked:border-blue-500 peer-checked:bg-blue-50 peer-checked:text-blue-700';
+              {['Baixa', 'Media', 'Alta'].map((level) => {
+                const value = level.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ""); // "Média" -> "media"
+                const isSelected = exerciseData.intensity === value;
 
-                 return (
-                 <label key={level} className="flex-1 cursor-pointer group">
-                   <input 
-                      type="radio" 
-                      name="intensity" 
-                      value={value} 
+                let colorClass = 'peer-checked:border-nutri-500 peer-checked:bg-nutri-50 peer-checked:text-nutri-700';
+                if (value === 'alta') colorClass = 'peer-checked:border-red-500 peer-checked:bg-red-50 peer-checked:text-red-700';
+                if (value === 'baixa') colorClass = 'peer-checked:border-blue-500 peer-checked:bg-blue-50 peer-checked:text-blue-700';
+
+                return (
+                  <label key={level} className="flex-1 cursor-pointer group">
+                    <input
+                      type="radio"
+                      name="intensity"
+                      value={value}
                       checked={isSelected}
-                      onChange={() => setExerciseData({...exerciseData, intensity: value})}
+                      onChange={() => setExerciseData({ ...exerciseData, intensity: value })}
                       className="hidden peer"
-                   />
-                   <div className={`text-center py-4 rounded-xl border border-gray-200 transition-all duration-200 font-medium ${colorClass} hover:border-gray-300`}>
-                     {level}
-                   </div>
-                 </label>
-               )})}
+                    />
+                    <div className={`text-center py-4 rounded-xl border border-gray-200 transition-all duration-200 font-medium ${colorClass} hover:border-gray-300`}>
+                      {level}
+                    </div>
+                  </label>
+                )
+              })}
             </div>
           </div>
 
