@@ -137,49 +137,15 @@ const RegisterMeal: React.FC<RegisterMealProps> = ({ onSave, onUpdate, history =
     setEditingId(null); // Ensure we are creating new unless explicitly editing
 
     try {
-      // Detect MIME type - fallback for cameras that don't provide it
-      let mimeType = file.type;
-      if (!mimeType || mimeType === '') {
-        // Detect from file name extension
-        const ext = file.name.split('.').pop()?.toLowerCase();
-        const mimeMap: Record<string, string> = {
-          'jpg': 'image/jpeg',
-          'jpeg': 'image/jpeg',
-          'png': 'image/png',
-          'gif': 'image/gif',
-          'webp': 'image/webp',
-          'heic': 'image/heic',
-          'heif': 'image/heif'
-        };
-        mimeType = mimeMap[ext || ''] || 'image/jpeg'; // Default to JPEG
-      }
+      // Always convert to JPEG using canvas to ensure compatibility
+      // This handles HEIC (iPhone), WebP, and other formats that may not be supported
+      console.log(`Processing image: ${file.name}, size: ${(file.size / 1024).toFixed(0)}KB, type: ${file.type || 'unknown'}`);
 
-      // Compress image if it's large (camera photos can be 5-10MB)
-      const fileSizeKB = file.size / 1024;
-      let base64Data: string;
-      let finalMimeType: string;
-
-      if (fileSizeKB > 1500) {
-        // Compress large images
-        console.log(`Compressing image from ${fileSizeKB.toFixed(0)}KB`);
-        const compressed = await compressImage(file);
-        base64Data = compressed.base64;
-        finalMimeType = compressed.mimeType;
-        console.log(`Compressed to ${(base64Data.length / 1024 * 0.75).toFixed(0)}KB`);
-      } else {
-        // Use original for smaller images
-        const reader = new FileReader();
-        const result = await new Promise<string>((resolve, reject) => {
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.onerror = () => reject(new Error('Failed to read file'));
-          reader.readAsDataURL(file);
-        });
-        base64Data = result.split(',')[1];
-        finalMimeType = mimeType;
-      }
+      const { base64, mimeType } = await compressImage(file);
+      console.log(`Converted to JPEG, final size: ${(base64.length / 1024 * 0.75).toFixed(0)}KB`);
 
       try {
-        const analysis = await analyzeFoodImage(base64Data, finalMimeType);
+        const analysis = await analyzeFoodImage(base64, mimeType);
 
         if (analysis) {
           setMealData(prev => ({
