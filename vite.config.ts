@@ -69,10 +69,8 @@ export default defineConfig(({ mode }) => {
         },
       }),
     ],
-    define: {
-      'process.env.API_KEY': JSON.stringify(env.VITE_GEMINI_API_KEY),
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.VITE_GEMINI_API_KEY)
-    },
+    // Environment variables with VITE_ prefix are automatically available
+    // GEMINI_API_KEY is now server-side only (no VITE_ prefix)
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
