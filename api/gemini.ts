@@ -2,7 +2,6 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 // Gemini API key is now server-side only (no VITE_ prefix)
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1/models';
 
 interface GeminiRequest {
     action: 'chat' | 'analyze-food' | 'calculate-nutrition' | 'generate-meal-plan' | 'generate-recipes';
@@ -24,9 +23,19 @@ interface GeminiApiResponse {
     error?: { message: string };
 }
 
-// Model constants
-const MODEL_STANDARD = 'gemini-1.5-flash';  // For chat, meal plans, recipes
-const MODEL_PREMIUM = 'gemini-1.5-flash';   // TODO: Change to gemini-2.5-flash when billing is enabled
+// Model configuration - each model has its own API endpoint
+const MODELS = {
+    // For image analysis and nutrition calculation (more accurate)
+    PREMIUM: {
+        name: 'gemini-2.5-flash',
+        apiUrl: 'https://generativelanguage.googleapis.com/v1beta/models'
+    },
+    // For chat, meal plans, recipes (stable)
+    STANDARD: {
+        name: 'gemini-1.5-flash',
+        apiUrl: 'https://generativelanguage.googleapis.com/v1/models'
+    }
+};
 
 async function callGemini(
     contents: GeminiContent | string,
@@ -34,7 +43,7 @@ async function callGemini(
     responseSchema?: Record<string, unknown>,
     usePremiumModel: boolean = false
 ): Promise<string> {
-    const model = usePremiumModel ? MODEL_PREMIUM : MODEL_STANDARD;
+    const modelConfig = usePremiumModel ? MODELS.PREMIUM : MODELS.STANDARD;
 
     const requestBody: Record<string, unknown> = {
         contents: typeof contents === 'string'
@@ -54,7 +63,7 @@ async function callGemini(
     }
 
     const response = await fetch(
-        `${GEMINI_API_URL}/${model}:generateContent?key=${GEMINI_API_KEY}`,
+        `${modelConfig.apiUrl}/${modelConfig.name}:generateContent?key=${GEMINI_API_KEY}`,
         {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
