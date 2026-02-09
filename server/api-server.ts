@@ -1,13 +1,24 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import express from 'express';
+import cors from 'cors';
 import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
 
-// Environment variables (server-side only)
+// Load environment variables
+dotenv.config({ path: '.env.local' });
+
+const app = express();
+const PORT = 3333;
+
+// Middleware
+app.use(cors());
+app.use(express.json({ limit: '10mb' }));
+
+// Environment variables
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-// Using anon key is safe here because we configured RLS policies on meal_analysis table
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 
-// Supabase client for cache operations
+// Supabase client
 const supabase = SUPABASE_URL && SUPABASE_ANON_KEY
     ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
     : null;
@@ -16,7 +27,6 @@ interface GeminiRequest {
     action: 'chat' | 'analyze-food' | 'calculate-nutrition' | 'generate-meal-plan' | 'generate-recipes' | 'generate-shopping-list' | 'generate-clinical-summary';
     payload: Record<string, unknown>;
 }
-
 
 interface GeminiContent {
     parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }>;
@@ -38,26 +48,22 @@ interface ModelConfig {
     apiUrl: string;
 }
 
-// Model configuration - Updated to match Google AI Studio model names (Feb 2026)
+// Model configuration - Updated to match Google AI Studio model names
 const MODELS = {
-    // Primary model for vision and complex logic
     VISION: {
-        name: 'gemini-2.5-flash',
+        name: 'gemini-2.5-flash',  // Primary vision model
         apiUrl: 'https://generativelanguage.googleapis.com/v1beta/models'
     },
-    // Fallback for vision (lower quota usage)
     VISION_FALLBACK: {
-        name: 'gemini-2.5-flash-lite',
+        name: 'gemini-2.5-flash-lite',  // Fallback with lower quota usage
         apiUrl: 'https://generativelanguage.googleapis.com/v1beta/models'
     },
-    // For complex calculations and meal planning
     LOGIC: {
-        name: 'gemini-2.5-flash',
+        name: 'gemini-2.5-flash',  // For complex calculations
         apiUrl: 'https://generativelanguage.googleapis.com/v1beta/models'
     },
-    // For chat and recipes (lower quota usage)
     LITE: {
-        name: 'gemini-2.5-flash-lite',
+        name: 'gemini-2.5-flash-lite',  // For chat and recipes (lower quota)
         apiUrl: 'https://generativelanguage.googleapis.com/v1beta/models'
     }
 };
@@ -74,11 +80,8 @@ Regras Estritas:
 
 // Generate SHA-256 hash for image caching
 async function sha256(data: string): Promise<string> {
-    const encoder = new TextEncoder();
-    const dataBuffer = encoder.encode(data);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', dataBuffer);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    const crypto = await import('crypto');
+    return crypto.createHash('sha256').update(data).digest('hex');
 }
 
 // Core Gemini API call
@@ -135,7 +138,6 @@ async function callWithFallback(
         return await callGemini(primary, contents, systemInstruction, responseSchema);
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        // If quota exceeded and we have a fallback, try it
         if (fallback && (errorMessage.includes('quota') || errorMessage.includes('429') || errorMessage.includes('RESOURCE_EXHAUSTED'))) {
             console.log(`Primary model ${primary.name} quota exceeded, falling back to ${fallback.name}`);
             return await callGemini(fallback, contents, systemInstruction, responseSchema);
@@ -222,7 +224,7 @@ MODO CLÍNICO ATIVO (${user.clinicalSettings.medication}):
 HISTÓRICO DA CONVERSA:
 ${conversationHistory}`;
     }
-    // Use LITE model for chat (cheaper, higher RPM)
+
     return callGemini(MODELS.LITE, message, systemInstruction);
 }
 
@@ -233,10 +235,10 @@ async function handleAnalyzeFood(payload: Record<string, unknown>): Promise<stri
         mimeType?: string;
     };
 
-    // 1. Generate hash for caching
-    const imageHash = await sha256(base64Data.substring(0, 10000)); // Use first 10k chars for faster hashing
+    // Generate hash for caching
+    const imageHash = await sha256(base64Data.substring(0, 10000));
 
-    // 2. Check cache in Supabase
+    // Check cache in Supabase
     if (supabase) {
         const { data: cached } = await supabase
             .from('meal_analysis')
@@ -250,7 +252,7 @@ async function handleAnalyzeFood(payload: Record<string, unknown>): Promise<stri
         }
     }
 
-    // 3. Prepare request content
+    // Prepare request content
     const contents: GeminiContent = {
         parts: [
             { inlineData: { mimeType, data: base64Data } },
@@ -285,7 +287,6 @@ async function handleAnalyzeFood(payload: Record<string, unknown>): Promise<stri
         required: ['name', 'calories', 'protein', 'carbs', 'fats', 'weight', 'ingredients']
     };
 
-    // 4. Call Gemini with fallback (VISION -> VISION_FALLBACK)
     const result = await callWithFallback(
         MODELS.VISION,
         MODELS.VISION_FALLBACK,
@@ -294,7 +295,7 @@ async function handleAnalyzeFood(payload: Record<string, unknown>): Promise<stri
         schema
     );
 
-    // 5. Save to cache
+    // Save to cache
     if (supabase && result) {
         try {
             const parsedResult = JSON.parse(result);
@@ -333,7 +334,6 @@ async function handleCalculateNutrition(payload: Record<string, unknown>): Promi
         required: ['calories', 'protein', 'carbs', 'fats']
     };
 
-    // Use LOGIC model (Gemini 3 Flash) for accurate nutrition calculation
     return callGemini(MODELS.LOGIC, prompt, undefined, schema);
 }
 
@@ -445,7 +445,7 @@ Este plano deve ser adaptado para quem usa medicação para perda de peso (GLP-1
         },
         required: ['meals']
     };
-    // Use LOGIC model (Gemini 3 Flash) for complex meal planning
+
     return callGemini(MODELS.LOGIC, prompt, undefined, schema);
 }
 
@@ -477,11 +477,11 @@ Retorne um JSON.`;
             }
         }
     };
-    // Use LITE model for recipes (cheaper, higher RPM)
+
     return callGemini(MODELS.LITE, prompt, undefined, schema);
 }
 
-// Handler for shopping list generation from ingredients
+// Handler for shopping list generation
 async function handleGenerateShoppingList(payload: Record<string, unknown>): Promise<string> {
     const { ingredients } = payload as { ingredients: string[] };
 
@@ -509,7 +509,7 @@ Retorne um JSON válido agrupando os itens por categoria. Mantenha as quantidade
     return callGemini(MODELS.LITE, prompt, undefined, schema);
 }
 
-// Handler for clinical summary generation (PDF reports)
+// Handler for clinical summary generation
 async function handleGenerateClinicalSummary(payload: Record<string, unknown>): Promise<string> {
     const { proteinAdherence, symptoms, medication, dosage, startDate } = payload as {
         proteinAdherence: number;
@@ -519,7 +519,6 @@ async function handleGenerateClinicalSummary(payload: Record<string, unknown>): 
         startDate?: string;
     };
 
-    // Count symptom frequency
     const symptomCounts = new Map<string, number>();
     for (const s of symptoms) {
         symptomCounts.set(s.symptom, (symptomCounts.get(s.symptom) || 0) + 1);
@@ -548,24 +547,11 @@ Retorne apenas o texto do resumo, sem formatação especial.`;
     return callGemini(MODELS.LOGIC, prompt);
 }
 
-
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-    // CORS headers
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
-    }
-
-    if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method not allowed' });
-    }
-
+// Main API endpoint
+app.post('/api/gemini', async (req, res) => {
     if (!GEMINI_API_KEY) {
         return res.status(500).json({
-            error: 'O assistente de IA não está configurado. Configure a variável GEMINI_API_KEY no servidor.'
+            error: 'O assistente de IA não está configurado. Configure a variável GEMINI_API_KEY no .env.local'
         });
     }
 
@@ -607,4 +593,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             error: error instanceof Error ? error.message : 'Erro ao processar requisição'
         });
     }
-}
+});
+
+// Health check
+app.get('/health', (req, res) => {
+    res.json({ status: 'ok', geminiConfigured: !!GEMINI_API_KEY });
+});
+
+// Start server
+app.listen(PORT, () => {
+    console.log(`🚀 API Server running at http://localhost:${PORT}`);
+    console.log(`   Gemini API: ${GEMINI_API_KEY ? '✅ Configured' : '❌ Missing GEMINI_API_KEY'}`);
+    console.log(`   Supabase: ${supabase ? '✅ Connected' : '⚠️ Not configured'}`);
+});

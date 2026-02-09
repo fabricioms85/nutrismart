@@ -81,8 +81,17 @@ export const calculateNutritionalInfo = async (foodItems: { name: string, quanti
     const result = await callGeminiApi('calculate-nutrition', { foodItems });
     return result ? JSON.parse(result) : null;
   } catch (error) {
-    console.error("Erro ao calcular nutrientes:", error);
-    throw error;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    // Check for quota exceeded or API errors
+    if (errorMessage.includes('quota') || errorMessage.includes('RESOURCE_EXHAUSTED')) {
+      console.warn("Limite da API Gemini atingido. Os nutrientes não foram calculados automaticamente.");
+    } else {
+      console.error("Erro ao calcular nutrientes:", error);
+    }
+
+    // Return null instead of throwing - allows user to save meal without AI calculation
+    return null;
   }
 };
 

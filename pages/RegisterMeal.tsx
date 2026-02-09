@@ -271,6 +271,9 @@ const RegisterMeal: React.FC<RegisterMealProps> = ({ onSave, onUpdate, history =
           carbs: result.carbs.toString(),
           fats: result.fats.toString(),
         }));
+      } else {
+        // result is null - API failed (quota exceeded, etc)
+        alert("Não foi possível calcular nutrientes automaticamente. O limite da API Gemini pode ter sido atingido. Por favor, insira os valores manualmente.");
       }
     } catch (error) {
       alert("Erro ao calcular nutrientes. Verifique sua conexão.");
@@ -313,6 +316,12 @@ const RegisterMeal: React.FC<RegisterMealProps> = ({ onSave, onUpdate, history =
           // Update visual state too so user sees it if the save fails or for continuity
           setMealData(currentData);
           console.log('handleSubmit: Auto-calculation successful:', result);
+        } else {
+          // result is null - API failed (quota exceeded, network error, etc)
+          console.warn('handleSubmit: Auto-calculation returned null');
+          alert("Não foi possível calcular os nutrientes automaticamente (limite da API ou conexão). Por favor, insira as calorias manualmente.");
+          setIsAnalyzing(false);
+          return; // STOP - don't save without calories!
         }
       } catch (error) {
         console.error("handleSubmit: Auto-calculation failed:", error);

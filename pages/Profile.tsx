@@ -8,7 +8,7 @@ import {
   Goal,
   ActivityLevel,
   Aggressiveness,
-  calculateNutritionalGoals,
+  calculateNutritionalGoalsV2,
   getActivityLevelLabel,
   getGoalLabel
 } from '../services/nutritionCalculator';
@@ -89,7 +89,7 @@ const Profile: React.FC<ProfileProps> = ({ user: initialUser, onUpdate, onSignOu
   }, [formData.weight, formData.height, formData.age, formData.gender, formData.goal, formData.activityLevel, aggressiveness, checkForChanges]);
 
   // Recalculate nutritional goals based on current form data
-  // Logic aligned with Onboarding.tsx for consistency
+  // Uses V2 calculator with g/kg protein model and clinical mode support
   const handleRecalculate = () => {
     const weight = formData.weight || 70;
     const height = formData.height || 170;
@@ -98,28 +98,30 @@ const Profile: React.FC<ProfileProps> = ({ user: initialUser, onUpdate, onSignOu
     const goal = goalDisplayToInternal[formData.goal || 'Manter Peso'] || 'manter_peso';
     const activityLevel = (formData.activityLevel as ActivityLevel) || 'moderado';
 
-    // Call with correct signature: (physicalData, goals, aggressiveness)
-    // Use aggressiveness always (same as Onboarding)
-    const nutritionalGoals = calculateNutritionalGoals(
+    // Use V2 with clinical mode and g/kg model
+    const nutritionalGoals = calculateNutritionalGoalsV2(
       { weight, height, age, gender },
       { goal, activityLevel },
-      aggressiveness
+      aggressiveness,
+      { isClinicalMode: formData.isClinicalMode }
     );
 
-    // Apply same bounds as Onboarding + clinical mode protein boost
-    const proteinMultiplier = formData.isClinicalMode ? 1.2 : 1.0;
-
-    // Map NutritionalGoals to User interface with bounds checking (same as Onboarding)
+    // V2 already applies all bounds and clinical mode protein boost
     setFormData(prev => ({
       ...prev,
-      dailyCalorieGoal: Math.min(4000, Math.max(1200, nutritionalGoals.calories)),
-      dailyWaterGoal: Math.min(5000, Math.max(1500, nutritionalGoals.water)),
+      dailyCalorieGoal: nutritionalGoals.calories,
+      dailyWaterGoal: nutritionalGoals.waterMl,
       macros: {
-        protein: Math.min(300, Math.max(50, Math.round(nutritionalGoals.protein * proteinMultiplier))),
-        carbs: Math.min(500, Math.max(50, nutritionalGoals.carbs)),
-        fats: Math.min(150, Math.max(20, nutritionalGoals.fats)),
+        protein: nutritionalGoals.proteinGrams,
+        carbs: nutritionalGoals.carbGrams,
+        fats: nutritionalGoals.fatGrams,
       },
     }));
+
+    // Show safety messages if any
+    if (nutritionalGoals.safetyMessages.length > 0) {
+      console.info('Safety alerts:', nutritionalGoals.safetyMessages);
+    }
 
     setShowRecalculateHint(false);
   };

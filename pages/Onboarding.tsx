@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     Scale,
     Ruler,
@@ -13,19 +13,22 @@ import {
     Droplet,
     Flame,
     Heart,
-    Pill
+    Pill,
+    TrendingDown,
+    TrendingUp
 } from 'lucide-react';
 import ClinicalSetup from '../components/ClinicalSetup';
-import { ClinicalSettings } from '../types';
+import { ClinicalSettings, WeightGoal, WeightEntry } from '../types';
 import {
     Gender,
     Goal,
     ActivityLevel,
     Aggressiveness,
-    calculateNutritionalGoals,
+    calculateNutritionalGoalsV2,
     getActivityLevelLabel,
     getGoalLabel
 } from '../services/nutritionCalculator';
+import { estimateTargetDate, generateMilestones } from '../services/PlateauDetectionService';
 
 interface OnboardingProps {
     userName: string;
@@ -49,6 +52,9 @@ export interface OnboardingData {
     // Clinical mode fields (optional)
     isClinicalMode?: boolean;
     clinicalSettings?: ClinicalSettings;
+    // Weight goal fields (optional)
+    weightGoal?: WeightGoal;
+    weightHistory?: WeightEntry[];
 }
 
 const Onboarding: React.FC<OnboardingProps> = ({ userName, onComplete }) => {
@@ -70,6 +76,10 @@ const Onboarding: React.FC<OnboardingProps> = ({ userName, onComplete }) => {
     const [activityLevel, setActivityLevel] = useState<ActivityLevel>('moderado');
     const [aggressiveness, setAggressiveness] = useState<Aggressiveness>('moderado');
 
+    // Step 2.5 - Weight Goal
+    const [targetWeight, setTargetWeight] = useState<number>(0);
+    const [weeklyGoal, setWeeklyGoal] = useState<number>(0.5);
+
     // Step 3 - Calculated Goals (adjustable)
     const [calories, setCalories] = useState<number>(2000);
     const [protein, setProtein] = useState<number>(150);
@@ -77,31 +87,50 @@ const Onboarding: React.FC<OnboardingProps> = ({ userName, onComplete }) => {
     const [fats, setFats] = useState<number>(65);
     const [water, setWater] = useState<number>(2500);
 
-    // Recalculate goals when entering step 3 (was step 3, now calculation step)
+    // Recalculate goals when entering step 3 (calculation step)
     useEffect(() => {
         if (step === 3 && weight > 0 && height > 0 && age > 0) {
-            const goals = calculateNutritionalGoals(
+            const goals = calculateNutritionalGoalsV2(
                 { weight, height, age, gender },
                 { goal, activityLevel },
-                aggressiveness
+                aggressiveness,
+                { isClinicalMode }
             );
-            // Ensure values are within reasonable bounds
-            setCalories(Math.min(4000, Math.max(1200, goals.calories)));
-            // If clinical mode, increase protein target
-            const proteinMultiplier = isClinicalMode ? 1.2 : 1.0;
-            setProtein(Math.min(300, Math.max(50, Math.round(goals.protein * proteinMultiplier))));
-            setCarbs(Math.min(500, Math.max(50, goals.carbs)));
-            setFats(Math.min(150, Math.max(20, goals.fats)));
-            setWater(Math.min(5000, Math.max(1500, goals.water)));
+            // V2 already applies bounds and clinical mode protein boost
+            setCalories(goals.calories);
+            setProtein(goals.proteinGrams);
+            setCarbs(goals.carbGrams);
+            setFats(goals.fatGrams);
+            setWater(goals.waterMl);
         }
-    }, [step, isClinicalMode]);
+    }, [step, isClinicalMode, weight, height, age, gender, goal, activityLevel, aggressiveness]);
 
 
-    // Total steps depends on clinical mode
-    // Step 0 = Objective, Step 1 = Basic Info, Step 2 = Goals, Step 3 = Nutritional Plan
-    // Step 4 = Clinical Setup (only if isClinicalMode)
-    const totalSteps = isClinicalMode ? 5 : 4;
+    // Total steps depends on clinical mode and goal type
+    // Step 0 = Objective, Step 1 = Basic Info, Step 2 = Goals
+    // Step 3 = Weight Target (only if goal !== 'manter_peso')
+    // Step 4 = Nutritional Plan, Step 5 = Clinical Setup (only if isClinicalMode)
+    const hasWeightGoal = goal !== 'manter_peso';
+    const totalSteps = (isClinicalMode ? 6 : 5) - (hasWeightGoal ? 0 : 1);
     const finalStep = totalSteps - 1;
+
+    // Calculate estimated date for weight goal
+    const estimatedDate = useMemo(() => {
+        if (!hasWeightGoal || targetWeight <= 0 || weight <= 0) return null;
+        return estimateTargetDate(weight, targetWeight, weeklyGoal);
+    }, [hasWeightGoal, weight, targetWeight, weeklyGoal]);
+
+    // Initialize target weight when entering weight goal step
+    useEffect(() => {
+        if (targetWeight === 0 && weight > 0) {
+            // Set reasonable default based on goal
+            if (goal === 'perder_peso') {
+                setTargetWeight(Math.round(weight * 0.9)); // 10% less
+            } else if (goal === 'ganhar_massa') {
+                setTargetWeight(Math.round(weight * 1.05)); // 5% more
+            }
+        }
+    }, [goal, weight, targetWeight]);
 
     const handleNext = () => {
         if (step < finalStep) {
@@ -118,6 +147,27 @@ const Onboarding: React.FC<OnboardingProps> = ({ userName, onComplete }) => {
     const handleComplete = async () => {
         setIsSubmitting(true);
         try {
+            // Build weight goal if applicable
+            let weightGoalData: WeightGoal | undefined;
+            if (hasWeightGoal && targetWeight > 0) {
+                const milestones = generateMilestones(weight, targetWeight).map((m, idx) => ({
+                    id: `milestone-${idx}`,
+                    targetWeight: m.weight,
+                    title: m.title,
+                    xpReward: m.xpReward
+                }));
+
+                weightGoalData = {
+                    startWeight: weight,
+                    targetWeight,
+                    startDate: new Date().toISOString(),
+                    estimatedDate: estimatedDate?.toISOString(),
+                    weeklyGoal: goal === 'perder_peso' ? -weeklyGoal : weeklyGoal,
+                    milestones,
+                    status: 'active'
+                };
+            }
+
             await onComplete({
                 weight,
                 height,
@@ -130,6 +180,8 @@ const Onboarding: React.FC<OnboardingProps> = ({ userName, onComplete }) => {
                 macros: { protein, carbs, fats },
                 isClinicalMode,
                 clinicalSettings,
+                weightGoal: weightGoalData,
+                weightHistory: weight > 0 ? [{ date: new Date().toISOString().split('T')[0], weight, source: 'manual' as const }] : []
             });
         } finally {
             setIsSubmitting(false);
@@ -417,8 +469,140 @@ const Onboarding: React.FC<OnboardingProps> = ({ userName, onComplete }) => {
                         </div>
                     )}
 
-                    {/* Step 3 - Nutritional Goals */}
-                    {step === 3 && (
+                    {/* Step 3 - Weight Goal (only if goal !== 'manter_peso') */}
+                    {step === 3 && hasWeightGoal && (
+                        <div className="space-y-8 animate-slide-in-right">
+                            <div className="text-center mb-6">
+                                <h2 className="font-heading font-bold text-2xl text-gray-900">
+                                    {goal === 'perder_peso' ? 'Sua Meta de Peso' : 'Seu Peso Alvo'}
+                                </h2>
+                                <p className="text-sm text-gray-400 mt-2">
+                                    Defina onde você quer chegar e em que ritmo
+                                </p>
+                            </div>
+
+                            {/* Weight Visualization */}
+                            <div className="bg-gradient-to-r from-gray-100 to-gray-50 rounded-[2rem] p-6">
+                                <div className="flex items-center justify-between">
+                                    {/* Current Weight */}
+                                    <div className="text-center">
+                                        <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Atual</p>
+                                        <p className="text-3xl font-bold text-gray-900">{weight}kg</p>
+                                    </div>
+
+                                    {/* Arrow */}
+                                    <div className="flex-1 flex items-center justify-center px-4">
+                                        <div className={`w-full h-1 ${goal === 'perder_peso' ? 'bg-gradient-to-r from-red-300 to-green-300' : 'bg-gradient-to-r from-gray-300 to-blue-300'} rounded-full relative`}>
+                                            {goal === 'perder_peso' ? (
+                                                <TrendingDown className="absolute left-1/2 -translate-x-1/2 -top-3 w-6 h-6 text-green-500" />
+                                            ) : (
+                                                <TrendingUp className="absolute left-1/2 -translate-x-1/2 -top-3 w-6 h-6 text-blue-500" />
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Target Weight */}
+                                    <div className="text-center">
+                                        <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Meta</p>
+                                        <div className="relative">
+                                            <input
+                                                type="number"
+                                                value={targetWeight}
+                                                onChange={(e) => setTargetWeight(Number(e.target.value))}
+                                                className={`text-3xl font-bold bg-transparent text-center focus:outline-none w-24 ${goal === 'perder_peso' ? 'text-green-600' : 'text-blue-600'
+                                                    }`}
+                                            />
+                                            <span className="text-gray-400 text-sm">kg</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Delta Display */}
+                                <div className="mt-4 text-center">
+                                    <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold ${goal === 'perder_peso'
+                                        ? 'bg-green-100 text-green-700'
+                                        : 'bg-blue-100 text-blue-700'
+                                        }`}>
+                                        {goal === 'perder_peso' ? (
+                                            <>
+                                                <TrendingDown size={16} />
+                                                Perder {Math.abs(weight - targetWeight).toFixed(1)}kg
+                                            </>
+                                        ) : (
+                                            <>
+                                                <TrendingUp size={16} />
+                                                Ganhar {Math.abs(targetWeight - weight).toFixed(1)}kg
+                                            </>
+                                        )}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Weekly Goal Slider */}
+                            <div>
+                                <label className="flex items-center gap-2 text-sm font-bold text-gray-700 mb-3 px-1">
+                                    <Sparkles size={18} className="text-nutri-500" />
+                                    Velocidade Semanal
+                                </label>
+                                <div className="bg-gray-50 rounded-[1.5rem] p-4">
+                                    <div className="flex justify-between mb-3">
+                                        <span className="text-xs text-gray-400">Mais Lento</span>
+                                        <span className="text-lg font-bold text-gray-900">
+                                            {goal === 'perder_peso' ? '-' : '+'}{weeklyGoal}kg/semana
+                                        </span>
+                                        <span className="text-xs text-gray-400">Mais Rápido</span>
+                                    </div>
+                                    <input
+                                        type="range"
+                                        min="0.25"
+                                        max="1"
+                                        step="0.25"
+                                        value={weeklyGoal}
+                                        onChange={(e) => setWeeklyGoal(Number(e.target.value))}
+                                        className="w-full accent-nutri-500 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                                    />
+                                    <div className="flex justify-between mt-2 text-xs text-gray-400">
+                                        <span>0.25kg</span>
+                                        <span>0.5kg</span>
+                                        <span>0.75kg</span>
+                                        <span>1kg</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Estimated Date */}
+                            {estimatedDate && (
+                                <div className={`rounded-[1.5rem] p-5 ${goal === 'perder_peso' ? 'bg-green-50 border border-green-100' : 'bg-blue-50 border border-blue-100'
+                                    }`}>
+                                    <div className="flex items-center gap-3">
+                                        <div className={`w-12 h-12 rounded-full flex items-center justify-center ${goal === 'perder_peso' ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'
+                                            }`}>
+                                            <Calendar size={24} />
+                                        </div>
+                                        <div>
+                                            <p className="text-xs text-gray-500 uppercase tracking-wider">Projeção de Chegada</p>
+                                            <p className={`text-xl font-bold ${goal === 'perder_peso' ? 'text-green-700' : 'text-blue-700'
+                                                }`}>
+                                                {estimatedDate.toLocaleDateString('pt-BR', {
+                                                    day: 'numeric',
+                                                    month: 'long',
+                                                    year: 'numeric'
+                                                })}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Safety Note */}
+                            <p className="text-xs text-gray-400 text-center">
+                                💡 Perder mais de 1kg por semana pode não ser saudável. Consulte um profissional.
+                            </p>
+                        </div>
+                    )}
+
+                    {/* Step 4 - Nutritional Goals (or step 3 if no weight goal) */}
+                    {((step === 4 && hasWeightGoal) || (step === 3 && !hasWeightGoal)) && (
                         <div className="space-y-8 animate-slide-in-right">
                             <div className="text-center mb-6">
                                 <h2 className="font-heading font-bold text-2xl text-gray-900">Seu Plano</h2>
@@ -496,8 +680,9 @@ const Onboarding: React.FC<OnboardingProps> = ({ userName, onComplete }) => {
                         </div>
                     )}
 
-                    {/* Step 4 - Clinical Setup (only for clinical mode) */}
-                    {step === 4 && isClinicalMode && (
+                    {/* Step 5 - Clinical Setup (only for clinical mode) */}
+                    {/* Step number is 5 if hasWeightGoal, else 4 */}
+                    {((step === 5 && hasWeightGoal) || (step === 4 && !hasWeightGoal)) && isClinicalMode && (
                         <ClinicalSetup
                             onComplete={(settings) => {
                                 setClinicalSettings(settings);
@@ -517,73 +702,70 @@ const Onboarding: React.FC<OnboardingProps> = ({ userName, onComplete }) => {
                                 Voltar
                             </button>
 
-                            {/* Continue Button - Show if not final step AND not the step where we show 'Configure Treatment' */}
-                            {step < finalStep && !(step === 4 && isClinicalMode) && !(step === 3 && isClinicalMode) && (
-                                <button
-                                    onClick={handleNext}
-                                    disabled={
-                                        (step === 1 && !isStep1Valid) ||
-                                        (step === 2 && !isStep2Valid)
-                                    }
-                                    className="flex items-center gap-3 px-8 py-4 bg-gray-900 hover:bg-black disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white rounded-[1.25rem] transition-all font-bold shadow-lg shadow-gray-200 hover:scale-105 active:scale-95"
-                                >
-                                    Continuar
-                                    <ChevronRight size={20} />
-                                </button>
-                            )}
+                            {(() => {
+                                // Calculate current step context
+                                const nutritionalStep = hasWeightGoal ? 4 : 3;
+                                const clinicalStep = hasWeightGoal ? 5 : 4;
+                                const isOnNutritionalStep = step === nutritionalStep;
+                                const isOnClinicalStep = step === clinicalStep && isClinicalMode;
+                                const isOnWeightGoalStep = step === 3 && hasWeightGoal;
+                                const isBeforeNutritionalStep = step < nutritionalStep;
 
-                            {/* Finish Button - Non-clinical mode (step 3) */}
-                            {step === 3 && !isClinicalMode && (
-                                <button
-                                    onClick={handleComplete}
-                                    disabled={isSubmitting}
-                                    className="flex items-center gap-3 px-8 py-4 bg-nutri-500 hover:bg-nutri-600 disabled:bg-nutri-300 text-white rounded-[1.25rem] transition-all font-bold shadow-lg shadow-nutri-500/30 hover:shadow-nutri-500/50 hover:scale-105 active:scale-95"
-                                >
-                                    {isSubmitting ? (
-                                        <>
-                                            <Sparkles size={20} className="animate-spin" />
-                                            Criando Perfil...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <CheckCircle size={20} />
-                                            Finalizar Setup
-                                        </>
-                                    )}
-                                </button>
-                            )}
+                                // Finish Button - Last step (Nutritional for non-clinical, Clinical for clinical)
+                                if ((isOnNutritionalStep && !isClinicalMode) || isOnClinicalStep) {
+                                    return (
+                                        <button
+                                            onClick={handleComplete}
+                                            disabled={isSubmitting || (isClinicalMode && !clinicalSettings)}
+                                            className={`flex items-center gap-3 px-8 py-4 ${isClinicalMode
+                                                    ? 'bg-teal-500 hover:bg-teal-600 shadow-teal-500/30 hover:shadow-teal-500/50'
+                                                    : 'bg-nutri-500 hover:bg-nutri-600 shadow-nutri-500/30 hover:shadow-nutri-500/50'
+                                                } disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-[1.25rem] transition-all font-bold shadow-lg hover:scale-105 active:scale-95`}
+                                        >
+                                            {isSubmitting ? (
+                                                <>
+                                                    <Sparkles size={20} className="animate-spin" />
+                                                    Criando Perfil...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <CheckCircle size={20} />
+                                                    {isClinicalMode ? 'Concluir Configuração' : 'Finalizar Setup'}
+                                                </>
+                                            )}
+                                        </button>
+                                    );
+                                }
 
-                            {/* Continue to Clinical Button - Clinical mode at step 3 */}
-                            {step === 3 && isClinicalMode && (
-                                <button
-                                    onClick={handleNext}
-                                    className="flex items-center gap-3 px-8 py-4 bg-teal-500 hover:bg-teal-600 text-white rounded-[1.25rem] transition-all font-bold shadow-lg shadow-teal-500/30 hover:scale-105 active:scale-95"
-                                >
-                                    Configurar Tratamento
-                                    <Pill size={20} />
-                                </button>
-                            )}
+                                // Clinical Setup Button - On nutritional step for clinical users
+                                if (isOnNutritionalStep && isClinicalMode) {
+                                    return (
+                                        <button
+                                            onClick={handleNext}
+                                            className="flex items-center gap-3 px-8 py-4 bg-teal-500 hover:bg-teal-600 text-white rounded-[1.25rem] transition-all font-bold shadow-lg shadow-teal-500/30 hover:scale-105 active:scale-95"
+                                        >
+                                            Configurar Tratamento
+                                            <Pill size={20} />
+                                        </button>
+                                    );
+                                }
 
-                            {/* Finish Button - Clinical mode (step 4) */}
-                            {step === 4 && isClinicalMode && (
-                                <button
-                                    onClick={handleComplete}
-                                    disabled={isSubmitting || !clinicalSettings}
-                                    className="flex items-center gap-3 px-8 py-4 bg-teal-500 hover:bg-teal-600 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-[1.25rem] transition-all font-bold shadow-lg shadow-teal-500/30 hover:shadow-teal-500/50 hover:scale-105 active:scale-95"
-                                >
-                                    {isSubmitting ? (
-                                        <>
-                                            <Sparkles size={20} className="animate-spin" />
-                                            Criando Perfil...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <CheckCircle size={20} />
-                                            Concluir Configuração
-                                        </>
-                                    )}
-                                </button>
-                            )}
+                                // Continue Button - For all other steps
+                                return (
+                                    <button
+                                        onClick={handleNext}
+                                        disabled={
+                                            (step === 1 && !isStep1Valid) ||
+                                            (step === 2 && !isStep2Valid) ||
+                                            (isOnWeightGoalStep && targetWeight <= 0)
+                                        }
+                                        className="flex items-center gap-3 px-8 py-4 bg-gray-900 hover:bg-black disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white rounded-[1.25rem] transition-all font-bold shadow-lg shadow-gray-200 hover:scale-105 active:scale-95"
+                                    >
+                                        Continuar
+                                        <ChevronRight size={20} />
+                                    </button>
+                                );
+                            })()}
                         </div>
                     )}
                 </div>

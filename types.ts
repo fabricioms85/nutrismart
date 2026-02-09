@@ -18,6 +18,33 @@ export interface Symptom {
   createdAt?: string;
 }
 
+// Weight Goal Journey Types
+export interface WeightGoal {
+  startWeight: number;           // Peso inicial ao criar meta
+  targetWeight: number;          // Peso desejado
+  startDate: string;             // Data de início
+  targetDate?: string;           // Data alvo (opcional, definida pelo usuário)
+  estimatedDate?: string;        // Projeção calculada pela IA
+  weeklyGoal: number;            // Meta semanal (ex: -0.5 ou +0.3)
+  milestones: WeightMilestone[];
+  status: 'active' | 'achieved' | 'paused';
+}
+
+export interface WeightMilestone {
+  id: string;
+  targetWeight: number;          // Ex: 85kg (metade do caminho)
+  title: string;                 // "Metade do caminho!"
+  achievedAt?: string;
+  xpReward: number;
+}
+
+export interface WeightEntry {
+  date: string;
+  weight: number;
+  note?: string;                 // "Me senti mais leve"
+  source?: 'manual' | 'smart_scale' | 'wearable';
+}
+
 export interface User {
   name: string;
   email: string;
@@ -39,6 +66,9 @@ export interface User {
   // Clinical Mode fields
   isClinicalMode?: boolean;
   clinicalSettings?: ClinicalSettings;
+  // Weight Goal Journey fields
+  weightGoal?: WeightGoal;
+  weightHistory?: WeightEntry[];
 }
 
 

@@ -6,7 +6,9 @@ import {
   MessageCircle,
   Calendar,
   Utensils,
-  ChevronRight
+  ChevronRight,
+  Check,
+  Loader2
 } from 'lucide-react';
 import { DailyStats, User, Meal, Exercise, NavItem, Challenge } from '../types';
 import CalorieHero from '../components/CalorieHero';
@@ -17,7 +19,7 @@ import WeeklyChallenge from '../components/WeeklyChallenge';
 import MedicationTracker from '../components/MedicationTracker';
 import SymptomModal from '../components/SymptomModal';
 import { getWeeklyChallenge } from '../services/gamificationService';
-import { logSymptom } from '../services/databaseService';
+import { logSymptom, addWeightEntry } from '../services/databaseService';
 
 interface DashboardProps {
   user: User;
@@ -35,6 +37,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, userId, stats, updateWater,
   const [weight, setWeight] = useState<string>('');
   const [challenge, setChallenge] = useState<Challenge | null>(null);
   const [showSymptomModal, setShowSymptomModal] = useState(false);
+  const [isSavingWeight, setIsSavingWeight] = useState(false);
+  const [weightSaved, setWeightSaved] = useState(false);
 
   useEffect(() => {
     setChallenge(getWeeklyChallenge());
@@ -42,6 +46,26 @@ const Dashboard: React.FC<DashboardProps> = ({ user, userId, stats, updateWater,
 
   const handleLogSymptom = async (symptom: string, severity: number, notes?: string) => {
     await logSymptom(userId, symptom, severity, notes);
+  };
+
+  // Save weight directly with current date/time
+  const handleSaveWeight = async () => {
+    const weightValue = parseFloat(weight) || user.weight;
+    if (!weightValue || weightValue <= 0) return;
+
+    setIsSavingWeight(true);
+    const today = new Date().toISOString().split('T')[0];
+    const success = await addWeightEntry(userId, weightValue, today);
+
+    if (success) {
+      setWeightSaved(true);
+      // Show success feedback for 2 seconds
+      setTimeout(() => {
+        setWeightSaved(false);
+        window.location.reload();
+      }, 1500);
+    }
+    setIsSavingWeight(false);
   };
 
   const currentDate = new Date().toLocaleDateString('pt-BR', {
@@ -202,16 +226,35 @@ const Dashboard: React.FC<DashboardProps> = ({ user, userId, stats, updateWater,
                   <div className="relative group/input">
                     <input
                       type="number"
-                      value={weight}
-                      placeholder={user.weight?.toString() || ''}
+                      value={weight || user.weight || ''}
+                      placeholder={user.weight?.toString() || 'Digite seu peso'}
                       onChange={(e) => setWeight(e.target.value)}
-                      className="w-full bg-gray-50 border-2 border-transparent group-hover/input:border-gray-200 focus:border-nutri-500 rounded-2xl py-4 px-6 font-heading font-black text-3xl text-gray-900 focus:outline-none focus:ring-4 focus:ring-nutri-500/10 transition-all placeholder:text-gray-300"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && weight) {
+                          handleSaveWeight();
+                        }
+                      }}
+                      disabled={isSavingWeight}
+                      className="w-full bg-gray-50 border-2 border-transparent group-hover/input:border-gray-200 focus:border-nutri-500 rounded-2xl py-4 px-6 font-heading font-black text-3xl text-gray-900 focus:outline-none focus:ring-4 focus:ring-nutri-500/10 transition-all placeholder:text-gray-300 disabled:opacity-50"
                     />
                     <span className="absolute right-6 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">kg</span>
                   </div>
                 </div>
-                <button className="bg-gray-900 text-white w-16 h-16 rounded-2xl flex items-center justify-center hover:bg-black hover:scale-110 hover:rotate-90 transition-all duration-300 shadow-xl shadow-gray-900/20 active:scale-95">
-                  <Plus size={24} strokeWidth={3} />
+                <button
+                  onClick={handleSaveWeight}
+                  disabled={isSavingWeight || weightSaved}
+                  className={`w-16 h-16 rounded-2xl flex items-center justify-center transition-all duration-300 shadow-xl active:scale-95 ${weightSaved
+                      ? 'bg-green-500 text-white shadow-green-500/20'
+                      : 'bg-gray-900 text-white hover:bg-black hover:scale-110 hover:rotate-90 shadow-gray-900/20'
+                    } disabled:opacity-70`}
+                >
+                  {isSavingWeight ? (
+                    <Loader2 size={24} className="animate-spin" />
+                  ) : weightSaved ? (
+                    <Check size={24} strokeWidth={3} />
+                  ) : (
+                    <Plus size={24} strokeWidth={3} />
+                  )}
                 </button>
               </div>
             </div>
