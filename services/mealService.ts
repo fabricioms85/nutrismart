@@ -4,14 +4,51 @@ import { Meal } from '../types';
 
 export const TABLE_MEALS = 'meals';
 
+// Helper to map DB row to Meal object
+function mapToMeal(row: any): Meal {
+    return {
+        id: row.id,
+        name: row.name,
+        time: row.time,
+        date: row.date,
+        calories: row.calories,
+        weight: row.weight_grams,
+        ingredients: row.ingredients, // JSONB usually returned as object
+        macros: {
+            protein: row.macro_protein || 0,
+            carbs: row.macro_carbs || 0,
+            fats: row.macro_fats || 0,
+        },
+        type: row.meal_type,
+        image: row.image_url,
+    };
+}
+
+// Helper to map Meal object to DB row
+function mapToDBMeal(meal: Partial<Meal>): any {
+    const dbRow: any = {};
+    if (meal.name !== undefined) dbRow.name = meal.name;
+    if (meal.time !== undefined) dbRow.time = meal.time;
+    if (meal.date !== undefined) dbRow.date = meal.date;
+    if (meal.calories !== undefined) dbRow.calories = meal.calories;
+    if (meal.weight !== undefined) dbRow.weight_grams = meal.weight;
+    if (meal.ingredients !== undefined) dbRow.ingredients = meal.ingredients;
+    if (meal.type !== undefined) dbRow.meal_type = meal.type;
+    if (meal.image !== undefined) dbRow.image_url = meal.image;
+
+    if (meal.macros) {
+        if (meal.macros.protein !== undefined) dbRow.macro_protein = meal.macros.protein;
+        if (meal.macros.carbs !== undefined) dbRow.macro_carbs = meal.macros.carbs;
+        if (meal.macros.fats !== undefined) dbRow.macro_fats = meal.macros.fats;
+    }
+
+    return dbRow;
+}
+
 export async function getMeals(userId: string, date?: string): Promise<Meal[]> {
     let query = supabase.from(TABLE_MEALS).select('*').eq('user_id', userId);
 
     if (date) {
-        // Assuming 'date' column exists or we filter by timestamp range
-        // If the schema uses 'created_at', we need start/end of day.
-        // Let's assume a 'date' column for simplicity based on legacy code, 
-        // or strictly filter by ISO string date part if stored as such.
         query = query.eq('date', date);
     }
 
@@ -21,13 +58,14 @@ export async function getMeals(userId: string, date?: string): Promise<Meal[]> {
         console.error('Error fetching meals:', error);
         return [];
     }
-    return data as Meal[];
+    return data.map(mapToMeal);
 }
 
 export async function addMeal(userId: string, meal: Omit<Meal, 'id'>): Promise<Meal | null> {
+    const dbRow = mapToDBMeal(meal);
     const { data, error } = await supabase
         .from(TABLE_MEALS)
-        .insert({ ...meal, user_id: userId })
+        .insert({ ...dbRow, user_id: userId })
         .select()
         .single();
 
@@ -35,13 +73,14 @@ export async function addMeal(userId: string, meal: Omit<Meal, 'id'>): Promise<M
         console.error('Error adding meal:', error);
         return null;
     }
-    return data as Meal;
+    return mapToMeal(data);
 }
 
 export async function updateMeal(mealId: string, updates: Partial<Meal>): Promise<boolean> {
+    const dbUpdates = mapToDBMeal(updates);
     const { error } = await supabase
         .from(TABLE_MEALS)
-        .update(updates)
+        .update(dbUpdates)
         .eq('id', mealId);
 
     if (error) {
@@ -95,7 +134,7 @@ export async function getMealsPaginated(
         return { data: [], hasMore: false };
     }
 
-    const meals = data as Meal[];
+    const meals = data ? data.map(mapToMeal) : [];
     const hasMore = (count ?? 0) > options.offset + meals.length;
 
     return { data: meals, hasMore };

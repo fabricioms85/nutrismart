@@ -1,14 +1,26 @@
 
 import { supabase } from './supabaseClient';
+import { WeightEntry } from '../types';
 
 export const TABLE_WEIGHT_HISTORY = 'weight_history';
 
-export interface WeightEntry {
-    id: string;
-    user_id: string;
-    weight: number;
-    date: string;
-    created_at: string;
+// Helper to map DB row to WeightEntry object
+function mapToWeightEntry(row: any): WeightEntry {
+    return {
+        date: row.date,
+        weight: row.weight,
+        note: row.notes,
+        source: 'manual', // Default source as DB doesn't store it yet
+    };
+}
+
+// Helper to map WeightEntry object to DB row
+function mapToDBWeight(weight: WeightEntry): any {
+    return {
+        date: weight.date,
+        weight: weight.weight,
+        notes: weight.note,
+    };
 }
 
 export async function getWeightHistory(userId: string, days?: number): Promise<WeightEntry[]> {
@@ -30,14 +42,14 @@ export async function getWeightHistory(userId: string, days?: number): Promise<W
         console.error('Error fetching weight history:', error);
         return [];
     }
-    return data as WeightEntry[];
+    return data ? data.map(mapToWeightEntry) : [];
 }
 
 
-export async function addWeightEntry(userId: string, weight: number, date: string): Promise<boolean> {
+export async function addWeightEntry(userId: string, weight: number, date: string, note?: string): Promise<boolean> {
     const { error } = await supabase
         .from(TABLE_WEIGHT_HISTORY)
-        .insert({ user_id: userId, weight, date });
+        .insert({ user_id: userId, weight, date, notes: note });
 
     if (error) {
         console.error('Error adding weight entry:', error);

@@ -4,6 +4,31 @@ import { Exercise } from '../types';
 
 export const TABLE_EXERCISES = 'exercises';
 
+// Helper to map DB row to Exercise object
+function mapToExercise(row: any): Exercise {
+    return {
+        id: row.id,
+        name: row.name,
+        durationMinutes: row.duration_minutes,
+        caloriesBurned: row.calories_burned,
+        intensity: row.intensity,
+        time: row.time,
+        date: row.date,
+    };
+}
+
+// Helper to map Exercise object to DB row
+function mapToDBExercise(exercise: Partial<Exercise>): any {
+    const dbRow: any = {};
+    if (exercise.name !== undefined) dbRow.name = exercise.name;
+    if (exercise.durationMinutes !== undefined) dbRow.duration_minutes = exercise.durationMinutes;
+    if (exercise.caloriesBurned !== undefined) dbRow.calories_burned = exercise.caloriesBurned;
+    if (exercise.intensity !== undefined) dbRow.intensity = exercise.intensity;
+    if (exercise.time !== undefined) dbRow.time = exercise.time;
+    if (exercise.date !== undefined) dbRow.date = exercise.date;
+    return dbRow;
+}
+
 export async function getExercises(userId: string, date?: string): Promise<Exercise[]> {
     let query = supabase.from(TABLE_EXERCISES).select('*').eq('user_id', userId);
 
@@ -17,13 +42,14 @@ export async function getExercises(userId: string, date?: string): Promise<Exerc
         console.error('Error fetching exercises:', error);
         return [];
     }
-    return data as Exercise[];
+    return data ? data.map(mapToExercise) : [];
 }
 
 export async function addExercise(userId: string, exercise: Omit<Exercise, 'id'>): Promise<Exercise | null> {
+    const dbRow = mapToDBExercise(exercise);
     const { data, error } = await supabase
         .from(TABLE_EXERCISES)
-        .insert({ ...exercise, user_id: userId })
+        .insert({ ...dbRow, user_id: userId })
         .select()
         .single();
 
@@ -31,13 +57,14 @@ export async function addExercise(userId: string, exercise: Omit<Exercise, 'id'>
         console.error('Error adding exercise:', error);
         return null;
     }
-    return data as Exercise;
+    return mapToExercise(data);
 }
 
 export async function updateExercise(exerciseId: string, updates: Partial<Exercise>): Promise<boolean> {
+    const dbUpdates = mapToDBExercise(updates);
     const { error } = await supabase
         .from(TABLE_EXERCISES)
-        .update(updates)
+        .update(dbUpdates)
         .eq('id', exerciseId);
 
     if (error) {
@@ -91,7 +118,7 @@ export async function getExercisesPaginated(
         return { data: [], hasMore: false };
     }
 
-    const exercises = data as Exercise[];
+    const exercises = data ? data.map(mapToExercise) : [];
     const hasMore = (count ?? 0) > options.offset + exercises.length;
 
     return { data: exercises, hasMore };
