@@ -629,18 +629,18 @@ const RegisterMeal: React.FC<RegisterMealProps> = ({ onSave, onUpdate, onDelete 
   };
 
   return (
-    <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-8">
+    <div className="w-full max-w-full overflow-x-hidden pb-24 md:pb-8">
 
       {/* Header and Input Selection */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 md:p-8">
-        <div className="flex justify-between items-center mb-5 md:mb-6">
-          <h1 className="text-xl md:text-2xl font-bold text-gray-900">
+      <div className="bg-white md:rounded-2xl md:shadow-sm md:border border-gray-100 p-4 md:p-8 border-b md:border-b-0 space-y-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900 truncate pr-2">
             {editingId ? 'Editar Refeição' : 'Registrar Refeição'}
           </h1>
           {inputMode === 'manual' && (
             <button
               onClick={resetForm}
-              className="min-h-[44px] px-3 text-sm text-gray-500 hover:text-red-500 active:text-red-600 flex items-center gap-1.5 rounded-lg hover:bg-gray-100 transition"
+              className="min-h-[44px] px-3 text-sm text-gray-500 hover:text-red-500 active:text-red-600 flex items-center gap-1.5 rounded-lg hover:bg-gray-100 transition whitespace-nowrap"
             >
               <X size={18} /> Cancelar
             </button>
@@ -665,60 +665,56 @@ const RegisterMeal: React.FC<RegisterMealProps> = ({ onSave, onUpdate, onDelete 
         />
 
         {inputMode === 'none' && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 animate-fade-in">
-            {/* Camera Button: 1 col on mobile (compact), 2 cols on desktop (prominent) */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full">
+            {/* Camera Button: Full width on mobile (col-span-2), prominent */}
             <button
               onClick={() => cameraInputRef.current?.click()}
-              className="col-span-1 md:col-span-2 flex flex-col md:flex-row items-center justify-center md:justify-start gap-2 md:gap-4 p-3 md:p-5 min-h-[90px] md:min-h-[120px] rounded-2xl bg-amber-gradient text-white hover:opacity-95 hover:shadow-xl hover:shadow-orange-200/50 active:scale-[0.98] transition-all duration-200 group relative overflow-hidden"
+              className="col-span-2 md:col-span-2 w-full min-w-0 flex flex-col md:flex-row items-center justify-center md:justify-start gap-3 md:gap-4 p-4 md:p-5 min-h-[100px] md:min-h-[120px] rounded-2xl bg-amber-gradient text-white shadow-lg shadow-orange-500/20 active:scale-[0.98] transition-all duration-200 group relative overflow-hidden"
             >
               <div className="absolute top-0 right-0 p-3 opacity-10 rotate-12 transform scale-150 pointer-events-none hidden md:block">
                 <Camera size={80} />
               </div>
-              <div className="w-10 h-10 md:w-14 md:h-14 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform z-10 flex-shrink-0">
-                <Camera size={20} className="text-white md:w-7 md:h-7" />
+              <div className="w-12 h-12 md:w-14 md:h-14 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform z-10 flex-shrink-0">
+                <Camera size={24} className="text-white md:w-7 md:h-7" />
               </div>
-              <div className="text-center md:text-left z-10">
-                <span className="font-bold text-sm md:text-lg block leading-tight">Tirar Foto</span>
-                <span className="text-white/80 text-[10px] md:text-sm hidden md:block">IA identifica tudo</span>
+              <div className="text-center md:text-left z-10 flex flex-col items-center md:items-start min-w-0">
+                <span className="font-bold text-lg md:text-xl block leading-tight truncate w-full">Tirar Foto</span>
+                <span className="text-white/90 text-xs md:text-sm mt-0.5 truncate w-full">IA identifica o prato</span>
               </div>
             </button>
 
-            {/* Gallery Button: 1 col mobile, 1 col desktop */}
+            {/* Gallery Button */}
             <button
               onClick={() => galleryInputRef.current?.click()}
-              className="col-span-1 md:col-span-1 flex flex-col items-center justify-center gap-2 p-3 md:p-4 min-h-[90px] md:min-h-[120px] rounded-2xl border-2 border-teal-100 bg-teal-50 text-teal-700 hover:bg-teal-100 hover:border-teal-200 hover:shadow-lg active:scale-[0.98] transition-all duration-200 group"
+              className="col-span-1 md:col-span-1 w-full min-w-0 flex flex-col items-center justify-center gap-2 p-3 md:p-4 min-h-[90px] md:min-h-[120px] rounded-2xl border-2 border-teal-100 bg-teal-50 text-teal-700 active:scale-[0.98] transition-all duration-200 group overflow-hidden"
             >
-              <div className="w-9 h-9 md:w-11 md:h-11 bg-white rounded-xl flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
-                <ImageIcon size={18} className="text-teal-600 md:w-[22px] md:h-[22px]" />
+              <div className="w-10 h-10 md:w-11 md:h-11 bg-white rounded-xl flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform flex-shrink-0">
+                <ImageIcon size={20} className="text-teal-600 md:w-[22px] md:h-[22px]" />
               </div>
-              <span className="font-semibold text-xs md:text-sm">Galeria</span>
+              <span className="font-semibold text-xs md:text-sm truncate w-full text-center">Galeria</span>
             </button>
 
-            {/* Manual Button: 1 col mobile, 1 col desktop */}
+            {/* Manual Button */}
             <button
               onClick={handleManualClick}
-              className="col-span-1 md:col-span-1 flex flex-col items-center justify-center gap-2 p-3 md:p-4 min-h-[90px] md:min-h-[120px] rounded-2xl border-2 border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:border-slate-300 hover:shadow-lg active:scale-[0.98] transition-all duration-200 group"
+              className="col-span-1 md:col-span-1 w-full min-w-0 flex flex-col items-center justify-center gap-2 p-3 md:p-4 min-h-[90px] md:min-h-[120px] rounded-2xl border-2 border-slate-200 bg-slate-50 text-slate-700 active:scale-[0.98] transition-all duration-200 group overflow-hidden"
             >
-              <div className="w-9 h-9 md:w-11 md:h-11 bg-white rounded-xl flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
-                <PenTool size={18} className="text-slate-600 md:w-[22px] md:h-[22px]" />
+              <div className="w-10 h-10 md:w-11 md:h-11 bg-white rounded-xl flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform flex-shrink-0">
+                <PenTool size={20} className="text-slate-600 md:w-[22px] md:h-[22px]" />
               </div>
-              <span className="font-semibold text-xs md:text-sm">Manual</span>
+              <span className="font-semibold text-xs md:text-sm truncate w-full text-center">Manual</span>
             </button>
 
-            {/* Barcode Button: 1 col mobile, 4 cols desktop (Wait, desktop 4 cols would mean full row. Let's keep it compact or full width below) */}
-            {/* Let's make it col-span-1 on mobile to fit the grid perfectly (2x2), and distinct on desktop? */}
-            {/* Desktop is 4 cols. Camera(2) + Gallery(1) + Manual(1) = 4 (Full Row). Next Row: Barcode. */}
-            {/* Mobile is 2 cols. Camera(1) + Gallery(1) = 2 (Full Row). Manual(1) + Barcode(1) = 2 (Full Row). Perfect 2x2 Grid. */}
+            {/* Barcode Button: Full width on mobile to complete the grid nicely */}
             <button
               onClick={() => setShowBarcodeScanner(true)}
-              className="col-span-1 md:col-span-4 flex flex-col md:flex-row items-center justify-center gap-2 md:gap-3 p-3 md:p-4 min-h-[90px] md:min-h-[64px] rounded-2xl border-2 border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:border-amber-300 hover:shadow-lg active:scale-[0.98] transition-all duration-200 group"
+              className="col-span-2 md:col-span-4 w-full min-w-0 flex flex-row items-center justify-center md:justify-start gap-3 p-3 md:p-4 min-h-[60px] md:min-h-[64px] rounded-xl md:rounded-2xl border-2 border-amber-200 bg-amber-50 text-amber-700 active:scale-[0.98] transition-all duration-200 group overflow-hidden"
             >
-              <div className="w-9 h-9 md:w-8 md:h-8 bg-white rounded-lg flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
+              <div className="w-8 h-8 md:w-8 md:h-8 bg-white rounded-lg flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform flex-shrink-0">
                 <ScanLine size={18} className="text-amber-600" />
               </div>
-              <span className="font-semibold text-xs md:text-sm text-center md:text-left">
-                <span className="md:hidden">Código</span>
-                <span className="hidden md:inline">Escanear Código de Barras</span>
+              <span className="font-semibold text-sm truncate">
+                Escanear Código de Barras
               </span>
             </button>
           </div>
@@ -1108,7 +1104,7 @@ const RegisterMeal: React.FC<RegisterMealProps> = ({ onSave, onUpdate, onDelete 
       </div>
 
       {/* History Section */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 md:p-8">
+      <div className="bg-white md:rounded-2xl shadow-sm md:border border-gray-100 p-4 md:p-8 border-t md:border-t-0">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
           <h2 className="text-lg md:text-xl font-bold text-gray-900 flex items-center gap-2">
             <History size={22} className="text-teal-500" />
