@@ -31,10 +31,8 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ isOpen, onClose, onProd
     const [isLoading, setIsLoading] = useState(false);
     const [detectorUnavailable, setDetectorUnavailable] = useState(false);
 
-    const startScanning = useCallback(async () => {
-        setError('');
-        setDetectorUnavailable(false);
-
+    // ---- cleanup helpers ----
+    const cleanupCamera = useCallback(() => {
         if (scanIntervalRef.current) {
             clearInterval(scanIntervalRef.current);
             scanIntervalRef.current = null;
@@ -43,47 +41,64 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ isOpen, onClose, onProd
             stopCameraStream(streamRef.current);
             streamRef.current = null;
         }
+        if (videoRef.current) {
+            videoRef.current.srcObject = null;
+        }
+    }, []);
 
-        // 1) Pedir câmera primeiro (no smartphone a câmera só abre com getUserMedia)
+    // ---- main flow ----
+    const startScanning = useCallback(async () => {
+        setError('');
+        setDetectorUnavailable(false);
+        cleanupCamera();
+
+        // 1) Pedir câmera (no smartphone só abre com getUserMedia + HTTPS)
         const stream = await requestCameraPermission();
         if (!stream) {
             setStatus('manual');
             setError('Não foi possível acessar a câmera. Use HTTPS ou permita o acesso no navegador e digite o código abaixo.');
             return;
         }
-
         streamRef.current = stream;
+
+        // 2) Associar stream ao <video> — o elemento está sempre no DOM
         const video = videoRef.current;
         if (!video) {
+            // Fallback: se ainda não existir (não deveria acontecer)
             stopCameraStream(stream);
+            streamRef.current = null;
             setStatus('manual');
-            setError('Erro ao iniciar a câmera.');
+            setError('Erro interno ao iniciar vídeo. Digite o código manualmente.');
             return;
         }
 
         video.srcObject = stream;
-        // 2) Esperar o vídeo estar pronto (essencial no mobile para o preview aparecer)
-        await new Promise<void>((resolve, reject) => {
-            video.onloadeddata = () => resolve();
-            video.onerror = () => reject(new Error('Video load failed'));
-        });
+
+        // 3) Esperar o vídeo carregar os dados da câmera
         try {
+            await new Promise<void>((resolve, reject) => {
+                const timeout = setTimeout(() => reject(new Error('timeout')), 8000);
+                video.onloadeddata = () => { clearTimeout(timeout); resolve(); };
+                video.onerror = () => { clearTimeout(timeout); reject(new Error('video error')); };
+            });
             await video.play();
         } catch (e) {
-            console.warn('video.play() failed (mobile may still show):', e);
+            console.warn('video.play() issue:', e);
+            // Mesmo com erro no play, o stream pode estar ativo — continua
         }
 
-        // 3) Só depois verificar se o navegador reconhece código de barras pela câmera
+        // 4) Verificar se o navegador detecta código de barras automaticamente
         const supported = await isBarcodeDetectorSupported();
         if (!supported) {
             setDetectorUnavailable(true);
-            setStatus('scanning');
+            setStatus('scanning'); // câmera aberta, mas sem detecção automática
             return;
         }
 
         detectorRef.current = createBarcodeDetector();
         setStatus('scanning');
 
+        // 5) Loop de detecção
         scanIntervalRef.current = window.setInterval(async () => {
             if (!videoRef.current || !detectorRef.current) return;
             const barcode = await detectBarcodeFromVideo(videoRef.current, detectorRef.current);
@@ -91,10 +106,9 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ isOpen, onClose, onProd
                 handleBarcodeFound(barcode);
             }
         }, 250);
-    }, []);
+    }, [cleanupCamera]);
 
     const handleBarcodeFound = async (barcode: string) => {
-        // Stop scanning
         if (scanIntervalRef.current) {
             clearInterval(scanIntervalRef.current);
             scanIntervalRef.current = null;
@@ -104,7 +118,6 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ isOpen, onClose, onProd
         setStatus('found');
 
         const productData = await getProductByBarcode(barcode);
-
         if (productData) {
             setProduct(productData);
             setServingGrams(productData.servingSizeG || 100);
@@ -112,14 +125,12 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ isOpen, onClose, onProd
             setError(`Produto não encontrado: ${barcode}`);
             setStatus('manual');
         }
-
         setIsLoading(false);
     };
 
     const handleManualSearch = async () => {
         const cleanBarcode = manualBarcode.trim().replace(/\D/g, '');
         if (!cleanBarcode) return;
-
         await handleBarcodeFound(cleanBarcode);
     };
 
@@ -137,28 +148,21 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ isOpen, onClose, onProd
         startScanning();
     };
 
-    // Initialize on open
+    // ---- lifecycle ----
     useEffect(() => {
         if (isOpen) {
             startScanning();
         }
-
-        return () => {
-            // Cleanup
-            if (scanIntervalRef.current) {
-                clearInterval(scanIntervalRef.current);
-            }
-            if (streamRef.current) {
-                stopCameraStream(streamRef.current);
-            }
-        };
-    }, [isOpen, startScanning]);
+        return () => cleanupCamera();
+    }, [isOpen, startScanning, cleanupCamera]);
 
     if (!isOpen) return null;
 
     const calculatedNutrition = product
         ? calculateNutritionForServing(product, servingGrams)
         : null;
+
+    const showCamera = status === 'initializing' || status === 'scanning';
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
@@ -184,38 +188,73 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ isOpen, onClose, onProd
 
                 {/* Content */}
                 <div className="p-6">
-                    {/* Camera View */}
-                    {status === 'scanning' && (
-                        <div className="relative rounded-2xl overflow-hidden bg-gray-900 mb-4">
-                            <video
-                                ref={videoRef}
-                                className="w-full aspect-[4/3] object-cover"
-                                playsInline
-                                muted
-                            />
-                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                <div className="w-3/4 h-24 border-2 border-white/50 rounded-lg relative">
-                                    <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-nutri-400 rounded-tl-lg" />
-                                    <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-nutri-400 rounded-tr-lg" />
-                                    <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-nutri-400 rounded-bl-lg" />
-                                    <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-nutri-400 rounded-br-lg" />
+
+                    {/* ======= Camera / Video area ======= */}
+                    {/* Video element is ALWAYS in DOM (hidden when not needed) so videoRef is never null */}
+                    <div className={`relative rounded-2xl overflow-hidden bg-gray-900 mb-4 ${showCamera ? '' : 'hidden'}`}>
+                        <video
+                            ref={videoRef}
+                            className="w-full aspect-[4/3] object-cover"
+                            playsInline
+                            muted
+                            autoPlay
+                        />
+
+                        {/* Scanning overlay with guide frame */}
+                        {status === 'scanning' && (
+                            <>
+                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                    <div className="w-3/4 h-24 border-2 border-white/50 rounded-lg relative">
+                                        <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-nutri-400 rounded-tl-lg" />
+                                        <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-nutri-400 rounded-tr-lg" />
+                                        <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-nutri-400 rounded-bl-lg" />
+                                        <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-nutri-400 rounded-br-lg" />
+                                    </div>
+                                </div>
+                                <div className="absolute bottom-4 left-0 right-0 text-center">
+                                    <span className="bg-black/60 text-white text-sm px-4 py-2 rounded-full">
+                                        {detectorUnavailable
+                                            ? 'Seu navegador não reconhece código pela câmera. Digite abaixo.'
+                                            : 'Posicione o código de barras na área destacada'}
+                                    </span>
+                                </div>
+                            </>
+                        )}
+
+                        {/* Initializing spinner on top of video */}
+                        {status === 'initializing' && (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/70">
+                                <Loader2 size={48} className="text-white animate-spin mb-4" />
+                                <p className="text-white/80">Iniciando câmera...</p>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Manual entry + camera button when detector is unavailable */}
+                    {status === 'scanning' && detectorUnavailable && (
+                        <div className="space-y-3 mb-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Digite o código de barras
+                                </label>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={manualBarcode}
+                                        onChange={(e) => setManualBarcode(e.target.value)}
+                                        placeholder="Ex: 7891234567890"
+                                        className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-nutri-500 focus:ring-4 focus:ring-nutri-100"
+                                        onKeyDown={(e) => e.key === 'Enter' && handleManualSearch()}
+                                    />
+                                    <button
+                                        onClick={handleManualSearch}
+                                        disabled={!manualBarcode.trim()}
+                                        className="px-6 py-3 bg-nutri-500 text-white font-semibold rounded-xl hover:bg-nutri-600 transition-colors disabled:opacity-50"
+                                    >
+                                        Buscar
+                                    </button>
                                 </div>
                             </div>
-                            <div className="absolute bottom-4 left-0 right-0 text-center">
-                                <span className="bg-black/60 text-white text-sm px-4 py-2 rounded-full">
-                                    {detectorUnavailable
-                                        ? 'Seu navegador não reconhece código pela câmera. Digite o código abaixo.'
-                                        : 'Posicione o código de barras na área destacada'}
-                                </span>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Initializing */}
-                    {status === 'initializing' && (
-                        <div className="flex flex-col items-center justify-center py-12">
-                            <Loader2 size={48} className="text-nutri-500 animate-spin mb-4" />
-                            <p className="text-gray-600">Iniciando câmera...</p>
                         </div>
                     )}
 
@@ -227,7 +266,7 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ isOpen, onClose, onProd
                         </div>
                     )}
 
-                    {/* Manual Entry / Error */}
+                    {/* Manual Entry / Error (no camera) */}
                     {(status === 'manual' || status === 'error') && !isLoading && (
                         <div className="space-y-4">
                             {error && (
@@ -236,7 +275,6 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ isOpen, onClose, onProd
                                     <p className="text-orange-800 text-sm">{error}</p>
                                 </div>
                             )}
-
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                     Digite o código de barras manualmente
@@ -265,7 +303,6 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ isOpen, onClose, onProd
                     {/* Product Found */}
                     {product && !isLoading && (
                         <div className="space-y-6">
-                            {/* Product Info */}
                             <div className="flex items-start gap-4 p-4 bg-gray-50 rounded-2xl">
                                 {product.image ? (
                                     <img
@@ -287,7 +324,6 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ isOpen, onClose, onProd
                                 </div>
                             </div>
 
-                            {/* Serving Size */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                     Quantidade (gramas)
@@ -313,7 +349,6 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ isOpen, onClose, onProd
                                 </div>
                             </div>
 
-                            {/* Nutrition Info */}
                             {calculatedNutrition && (
                                 <div className="grid grid-cols-4 gap-3">
                                     <div className="bg-orange-50 p-3 rounded-xl text-center">
@@ -335,7 +370,6 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ isOpen, onClose, onProd
                                 </div>
                             )}
 
-                            {/* Actions */}
                             <div className="flex gap-3">
                                 <button
                                     onClick={resetScanner}
@@ -354,10 +388,13 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ isOpen, onClose, onProd
                         </div>
                     )}
 
-                    {/* Switch to manual entry */}
-                    {status === 'scanning' && (
+                    {/* Switch to manual entry button */}
+                    {status === 'scanning' && !detectorUnavailable && (
                         <button
-                            onClick={() => setStatus('manual')}
+                            onClick={() => {
+                                cleanupCamera();
+                                setStatus('manual');
+                            }}
                             className="w-full py-3 text-gray-600 hover:text-gray-800 transition-colors flex items-center justify-center gap-2"
                         >
                             <CameraOff size={18} />
