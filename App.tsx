@@ -159,12 +159,21 @@ const AppContent: React.FC = () => {
 
   const handleUpdateMeal = async (updatedMeal: Meal) => {
     try {
+      console.log('[handleUpdateMeal] Atualizando refeição:', updatedMeal.id, {
+        name: updatedMeal.name,
+        calories: updatedMeal.calories,
+        protein: updatedMeal.macros?.protein,
+        carbs: updatedMeal.macros?.carbs,
+        fats: updatedMeal.macros?.fats,
+        ingredientsCount: updatedMeal.ingredients?.length,
+      });
       await updateMeal(updatedMeal.id, updatedMeal);
-      // await refreshProfile(); // Refresh profile/context if needed
       toast.success('Refeição atualizada com sucesso!');
-      setActiveItem(NavItem.Dashboard);
     } catch (error) {
-      toast.error('Erro ao atualizar refeição.');
+      console.error('[handleUpdateMeal] Erro:', error);
+      const msg = error instanceof Error ? error.message : 'Erro desconhecido';
+      toast.error(`Erro ao atualizar refeição: ${msg}`);
+      throw error; // Re-lança para que o RegisterMeal saiba que falhou e NÃO resete o form
     }
   };
 

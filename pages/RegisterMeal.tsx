@@ -573,7 +573,14 @@ const RegisterMeal: React.FC<RegisterMealProps> = ({ onSave, onUpdate, onDelete 
 
     try {
       if (editingId) {
-        console.log('handleSubmit: Updating existing meal:', editingId);
+        console.log('handleSubmit: Updating existing meal:', editingId, 'with data:', {
+          name: commonData.name,
+          calories: commonData.calories,
+          protein: commonData.macros.protein,
+          carbs: commonData.macros.carbs,
+          fats: commonData.macros.fats,
+          ingredientsCount: commonData.ingredients?.length,
+        });
         // Update existing - onUpdate is async in App.tsx
         await onUpdate({
           id: editingId,

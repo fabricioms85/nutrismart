@@ -29,45 +29,68 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ isOpen, onClose, onProd
     const [product, setProduct] = useState<BarcodeProduct | null>(null);
     const [servingGrams, setServingGrams] = useState(100);
     const [isLoading, setIsLoading] = useState(false);
+    const [detectorUnavailable, setDetectorUnavailable] = useState(false);
 
     const startScanning = useCallback(async () => {
-        // Check if BarcodeDetector is supported
-        const supported = await isBarcodeDetectorSupported();
+        setError('');
+        setDetectorUnavailable(false);
 
-        if (!supported) {
-            setStatus('manual');
-            setError('Seu navegador não suporta leitura de código de barras pela câmera. Digite o código manualmente.');
-            return;
+        if (scanIntervalRef.current) {
+            clearInterval(scanIntervalRef.current);
+            scanIntervalRef.current = null;
+        }
+        if (streamRef.current) {
+            stopCameraStream(streamRef.current);
+            streamRef.current = null;
         }
 
-        // Request camera access
+        // 1) Pedir câmera primeiro (no smartphone a câmera só abre com getUserMedia)
         const stream = await requestCameraPermission();
         if (!stream) {
             setStatus('manual');
-            setError('Não foi possível acessar a câmera. Digite o código manualmente.');
+            setError('Não foi possível acessar a câmera. Use HTTPS ou permita o acesso no navegador e digite o código abaixo.');
             return;
         }
 
         streamRef.current = stream;
-
-        if (videoRef.current) {
-            videoRef.current.srcObject = stream;
-            await videoRef.current.play();
+        const video = videoRef.current;
+        if (!video) {
+            stopCameraStream(stream);
+            setStatus('manual');
+            setError('Erro ao iniciar a câmera.');
+            return;
         }
 
-        // Create detector
+        video.srcObject = stream;
+        // 2) Esperar o vídeo estar pronto (essencial no mobile para o preview aparecer)
+        await new Promise<void>((resolve, reject) => {
+            video.onloadeddata = () => resolve();
+            video.onerror = () => reject(new Error('Video load failed'));
+        });
+        try {
+            await video.play();
+        } catch (e) {
+            console.warn('video.play() failed (mobile may still show):', e);
+        }
+
+        // 3) Só depois verificar se o navegador reconhece código de barras pela câmera
+        const supported = await isBarcodeDetectorSupported();
+        if (!supported) {
+            setDetectorUnavailable(true);
+            setStatus('scanning');
+            return;
+        }
+
         detectorRef.current = createBarcodeDetector();
         setStatus('scanning');
 
-        // Start scanning loop
         scanIntervalRef.current = window.setInterval(async () => {
             if (!videoRef.current || !detectorRef.current) return;
-
             const barcode = await detectBarcodeFromVideo(videoRef.current, detectorRef.current);
             if (barcode) {
                 handleBarcodeFound(barcode);
             }
-        }, 250); // Scan every 250ms
+        }, 250);
     }, []);
 
     const handleBarcodeFound = async (barcode: string) => {
@@ -180,7 +203,9 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ isOpen, onClose, onProd
                             </div>
                             <div className="absolute bottom-4 left-0 right-0 text-center">
                                 <span className="bg-black/60 text-white text-sm px-4 py-2 rounded-full">
-                                    Posicione o código de barras na área destacada
+                                    {detectorUnavailable
+                                        ? 'Seu navegador não reconhece código pela câmera. Digite o código abaixo.'
+                                        : 'Posicione o código de barras na área destacada'}
                                 </span>
                             </div>
                         </div>

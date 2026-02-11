@@ -25,21 +25,23 @@ function mapToMeal(row: any): Meal {
 }
 
 // Helper to map Meal object to DB row
+// IMPORTANT: macro_protein, macro_carbs, macro_fats and calories are INTEGER in Postgres.
+// Always round to avoid "invalid input syntax for type integer" errors.
 function mapToDBMeal(meal: Partial<Meal>): any {
     const dbRow: any = {};
     if (meal.name !== undefined) dbRow.name = meal.name;
     if (meal.time !== undefined) dbRow.time = meal.time;
     if (meal.date !== undefined) dbRow.date = meal.date;
-    if (meal.calories !== undefined) dbRow.calories = meal.calories;
-    if (meal.weight !== undefined) dbRow.weight_grams = meal.weight;
+    if (meal.calories !== undefined) dbRow.calories = Math.round(Number(meal.calories));
+    if (meal.weight !== undefined) dbRow.weight_grams = Math.round(Number(meal.weight));
     if (meal.ingredients !== undefined) dbRow.ingredients = meal.ingredients;
     if (meal.type !== undefined) dbRow.meal_type = meal.type;
     if (meal.image !== undefined) dbRow.image_url = meal.image;
 
     if (meal.macros) {
-        if (meal.macros.protein !== undefined) dbRow.macro_protein = meal.macros.protein;
-        if (meal.macros.carbs !== undefined) dbRow.macro_carbs = meal.macros.carbs;
-        if (meal.macros.fats !== undefined) dbRow.macro_fats = meal.macros.fats;
+        if (meal.macros.protein !== undefined) dbRow.macro_protein = Math.round(Number(meal.macros.protein));
+        if (meal.macros.carbs !== undefined) dbRow.macro_carbs = Math.round(Number(meal.macros.carbs));
+        if (meal.macros.fats !== undefined) dbRow.macro_fats = Math.round(Number(meal.macros.fats));
     }
 
     return dbRow;
@@ -76,18 +78,29 @@ export async function addMeal(userId: string, meal: Omit<Meal, 'id'>): Promise<M
     return mapToMeal(data);
 }
 
-export async function updateMeal(mealId: string, updates: Partial<Meal>): Promise<boolean> {
+export async function updateMeal(mealId: string, updates: Partial<Meal>): Promise<Meal> {
     const dbUpdates = mapToDBMeal(updates);
-    const { error } = await supabase
+    console.log('[mealService.updateMeal] id:', mealId, 'payload:', dbUpdates);
+
+    const { data, error } = await supabase
         .from(TABLE_MEALS)
         .update(dbUpdates)
-        .eq('id', mealId);
+        .eq('id', mealId)
+        .select()
+        .single();
 
     if (error) {
-        console.error('Error updating meal:', error);
-        return false;
+        console.error('[mealService.updateMeal] Supabase error:', error);
+        throw new Error(`Falha ao atualizar refeição: ${error.message}`);
     }
-    return true;
+
+    if (!data) {
+        console.error('[mealService.updateMeal] Nenhuma linha retornada — RLS pode estar bloqueando o update');
+        throw new Error('Atualização não surtiu efeito. Verifique as permissões.');
+    }
+
+    console.log('[mealService.updateMeal] Sucesso. Dados retornados:', data);
+    return mapToMeal(data);
 }
 
 export async function deleteMeal(mealId: string): Promise<boolean> {

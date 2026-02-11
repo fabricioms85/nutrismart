@@ -88,17 +88,37 @@ export async function isCameraAvailable(): Promise<boolean> {
     }
 }
 
-// Request camera permission
+// Request camera permission (mobile-friendly: back camera on phones, works on HTTPS/localhost)
 export async function requestCameraPermission(): Promise<MediaStream | null> {
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: 'environment' } // Prefer back camera
-        });
-        return stream;
-    } catch (error) {
-        console.error('Camera permission denied:', error);
+    if (!navigator.mediaDevices?.getUserMedia) {
+        console.error('getUserMedia not supported (use HTTPS or localhost)');
         return null;
     }
+    const constraints: MediaStreamConstraints[] = [
+        // Preferência para mobile: câmera traseira, resolução adequada
+        {
+            video: {
+                facingMode: 'environment',
+                width: { ideal: 1280, min: 640 },
+                height: { ideal: 720, min: 480 },
+            },
+            audio: false,
+        },
+        // Fallback: só câmera traseira
+        { video: { facingMode: 'environment' }, audio: false },
+        // Fallback: qualquer câmera (desktop ou permissão restrita)
+        { video: true, audio: false },
+    ];
+    for (const c of constraints) {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia(c);
+            return stream;
+        } catch (err) {
+            console.warn('getUserMedia attempt failed:', c, err);
+        }
+    }
+    console.error('Camera permission denied or no working constraint');
+    return null;
 }
 
 // Stop camera stream
