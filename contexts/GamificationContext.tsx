@@ -33,7 +33,13 @@ export const GamificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     const refreshGamification = async () => {
         if (!authUser) return;
         try {
-            const progress = await gamificationService.getUserProgress(authUser.id);
+            let progress = await gamificationService.getUserProgress(authUser.id);
+
+            if (!progress) {
+                await gamificationService.initializeUserProgress(authUser.id);
+                progress = await gamificationService.getUserProgress(authUser.id);
+            }
+
             if (progress) {
                 setXp(progress.xp);
                 setLevel(progress.level);
