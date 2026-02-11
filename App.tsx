@@ -68,12 +68,14 @@ const AppLayout: React.FC<{ children: React.ReactNode; currentPath: NavItem; onN
           </button>
         </div>
 
-        <main className="flex-1 relative overflow-y-auto">
-          {/* Background Blobs for Pages */}
-          <div className="absolute top-0 right-0 w-[40rem] h-[40rem] bg-nutri-50/50 rounded-full mix-blend-multiply filter blur-3xl opacity-40 pointer-events-none -translate-y-1/2 translate-x-1/2" />
-          <div className="absolute bottom-0 left-0 w-[40rem] h-[40rem] bg-blue-50/50 rounded-full mix-blend-multiply filter blur-3xl opacity-40 pointer-events-none translate-y-1/3 -translate-x-1/3" />
+        <main className="flex-1 relative overflow-y-auto w-full">
+          {/* Background Blobs for Pages - Contained to prevent overflow */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+            <div className="absolute top-0 right-0 w-[40rem] h-[40rem] bg-nutri-50/50 rounded-full mix-blend-multiply filter blur-3xl opacity-40 -translate-y-1/2 translate-x-1/2" />
+            <div className="absolute bottom-0 left-0 w-[40rem] h-[40rem] bg-blue-50/50 rounded-full mix-blend-multiply filter blur-3xl opacity-40 translate-y-1/3 -translate-x-1/3" />
+          </div>
 
-          <div className="relative z-0">
+          <div className="relative z-10 w-full max-w-full">
             {children}
           </div>
         </main>

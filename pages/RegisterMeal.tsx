@@ -677,9 +677,9 @@ const RegisterMeal: React.FC<RegisterMealProps> = ({ onSave, onUpdate, onDelete 
               <div className="w-12 h-12 md:w-14 md:h-14 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform z-10 flex-shrink-0">
                 <Camera size={24} className="text-white md:w-7 md:h-7" />
               </div>
-              <div className="text-center md:text-left z-10 flex flex-col items-center md:items-start">
-                <span className="font-bold text-lg md:text-xl block leading-tight">Tirar Foto</span>
-                <span className="text-white/90 text-xs md:text-sm mt-0.5">IA identifica o prato</span>
+              <div className="text-center md:text-left z-10 flex flex-col items-center md:items-start min-w-0 max-w-full overflow-hidden">
+                <span className="font-bold text-lg md:text-xl block leading-tight truncate w-full">Tirar Foto</span>
+                <span className="text-white/90 text-xs md:text-sm mt-0.5 truncate w-full">IA identifica o prato</span>
               </div>
             </button>
 
@@ -691,7 +691,7 @@ const RegisterMeal: React.FC<RegisterMealProps> = ({ onSave, onUpdate, onDelete 
               <div className="w-10 h-10 md:w-11 md:h-11 bg-white rounded-xl flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform flex-shrink-0">
                 <ImageIcon size={20} className="text-teal-600 md:w-[22px] md:h-[22px]" />
               </div>
-              <span className="font-semibold text-xs md:text-sm text-center">Galeria</span>
+              <span className="font-semibold text-xs md:text-sm text-center truncate w-full">Galeria</span>
             </button>
 
             {/* Manual Button */}
@@ -702,7 +702,7 @@ const RegisterMeal: React.FC<RegisterMealProps> = ({ onSave, onUpdate, onDelete 
               <div className="w-10 h-10 md:w-11 md:h-11 bg-white rounded-xl flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform flex-shrink-0">
                 <PenTool size={20} className="text-slate-600 md:w-[22px] md:h-[22px]" />
               </div>
-              <span className="font-semibold text-xs md:text-sm text-center">Manual</span>
+              <span className="font-semibold text-xs md:text-sm text-center truncate w-full">Manual</span>
             </button>
 
             {/* Barcode Button: Full width on mobile to complete the grid nicely */}
@@ -713,7 +713,7 @@ const RegisterMeal: React.FC<RegisterMealProps> = ({ onSave, onUpdate, onDelete 
               <div className="w-8 h-8 md:w-8 md:h-8 bg-white rounded-lg flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform flex-shrink-0">
                 <ScanLine size={18} className="text-amber-600" />
               </div>
-              <span className="font-semibold text-sm">
+              <span className="font-semibold text-sm truncate min-w-0 flex-1 text-center md:text-left">
                 Escanear Código de Barras
               </span>
             </button>
@@ -1086,7 +1086,7 @@ const RegisterMeal: React.FC<RegisterMealProps> = ({ onSave, onUpdate, onDelete 
             </div>
 
             {/* Save Button - Sticky on mobile */}
-            <div className="sticky bottom-0 z-30 left-0 right-0 bg-white/95 backdrop-blur-sm pt-4 pb-6 -mx-6 px-6 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] md:relative md:mx-0 md:px-0 md:bg-transparent md:backdrop-blur-none md:shadow-none md:pb-0 border-t border-gray-100 md:border-0 mt-6 md:mt-4">
+            <div className="sticky bottom-0 z-30 left-0 right-0 bg-white/95 backdrop-blur-sm pt-4 pb-6 -mx-4 px-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] md:relative md:mx-0 md:px-0 md:bg-transparent md:backdrop-blur-none md:shadow-none md:pb-0 border-t border-gray-100 md:border-0 mt-6 md:mt-4">
               <button
                 type="submit"
                 disabled={isAnalyzing}
@@ -1110,13 +1110,13 @@ const RegisterMeal: React.FC<RegisterMealProps> = ({ onSave, onUpdate, onDelete 
             <History size={22} className="text-teal-500" />
             Histórico de Refeições
           </h2>
-          {/* Period Filter Tabs */}
-          <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
+          {/* Period Filter Tabs - Scrollable on mobile */}
+          <div className="flex gap-1 bg-gray-100 p-1 rounded-xl overflow-x-auto no-scrollbar max-w-full">
             {([['today', 'Hoje'], ['week', 'Semana'], ['month', 'Mês'], ['all', 'Todos']] as [HistoryPeriod, string][]).map(([key, label]) => (
               <button
                 key={key}
                 onClick={() => setHistoryPeriod(key)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${historyPeriod === key
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap flex-shrink-0 transition-all duration-200 ${historyPeriod === key
                   ? 'bg-white text-teal-700 shadow-sm'
                   : 'text-gray-500 hover:text-gray-700'
                   }`}
