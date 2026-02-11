@@ -34,7 +34,7 @@ export async function getUserProgress(userId: string) {
     .from(TABLE_USER_PROGRESS)
     .select('*')
     .eq('user_id', userId)
-    .single();
+    .maybeSingle();
 
   if (error) {
     console.error('Error fetching user progress:', error);
@@ -93,14 +93,14 @@ export async function initializeUserProgress(userId: string) {
 export async function getUserBadges(userId: string): Promise<{ id: string; earnedAt: string }[]> {
   const { data, error } = await supabase
     .from(TABLE_USER_BADGES)
-    .select('badge_id, created_at')
+    .select('badge_id, earned_at')
     .eq('user_id', userId);
 
   if (error) {
     console.error('Error fetching badges:', error);
     return [];
   }
-  return data.map((b: any) => ({ id: b.badge_id, earnedAt: b.created_at }));
+  return data.map((b: any) => ({ id: b.badge_id, earnedAt: b.earned_at }));
 }
 
 export async function getAllAchievements(): Promise<Achievement[]> {
@@ -126,7 +126,7 @@ export async function getActiveChallenge(userId: string): Promise<Challenge | nu
     .eq('user_id', userId)
     .gte('end_date', today)
     .lte('start_date', today)
-    .single();
+    .maybeSingle();
 
   if (error) return null;
   return data as Challenge;

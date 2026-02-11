@@ -71,7 +71,7 @@ const CalorieHero: React.FC<CalorieHeroProps> = ({ consumed, goal, burned, macro
                 <div className="relative flex flex-col items-center justify-center">
                     {/* Chart Container */}
                     <div className="relative h-56 md:h-72 w-56 md:w-72">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                             <PieChart>
                                 <Pie
                                     data={data}
