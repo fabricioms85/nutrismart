@@ -106,7 +106,7 @@ const LoadingScreen: React.FC = () => (
 const AppContent: React.FC = () => {
   const { authUser, profile, signOut, refreshProfile } = useAuth();
   const { meals, exercises, stats, addMeal, updateMeal, deleteMeal, addExercise, updateExercise, deleteExercise, addWater } = useNutrition();
-  const { xp, level, streak, badges: unlockedAchievements, weeklyStats, addXP, showLevelUp, setShowLevelUp, newLevel } = useGamification();
+  const { xp, level, streak, badges: unlockedAchievements, weeklyStats, awardXP, showLevelUp, setShowLevelUp, newLevel } = useGamification();
 
   const toast = useToast();
   const [activeItem, setActiveItem] = useState<NavItem>(NavItem.Dashboard);
@@ -149,7 +149,7 @@ const AppContent: React.FC = () => {
       setActiveItem(NavItem.Dashboard);
 
       // Award XP
-      const xpResult = await addXP(XP_VALUES.LOG_MEAL, 'registerMeal');
+      await awardXP(XP_VALUES.LOG_MEAL, 'registerMeal');
       toast.success(`Refeição registrada! +${XP_VALUES.LOG_MEAL} XP 🍽️`);
     } catch (error) {
       console.error('handleAddMeal: Error saving meal:', error);
@@ -182,7 +182,7 @@ const AppContent: React.FC = () => {
       await addExercise(newExercise);
 
       // Award XP
-      const xpResult = await addXP(XP_VALUES.LOG_EXERCISE, 'registerExercise');
+      await awardXP(XP_VALUES.LOG_EXERCISE, 'registerExercise');
       toast.success(`Exercício registrado! +${XP_VALUES.LOG_EXERCISE} XP 🏋️`);
     } catch (error) {
       toast.error('Erro ao salvar exercício');

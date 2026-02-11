@@ -1018,13 +1018,16 @@ const RegisterMeal: React.FC<RegisterMealProps> = ({ onSave, onUpdate, onDelete 
                   <button
                     type="button"
                     onClick={calculateTotalNutrition}
-                    className={`w-full font-medium flex items-center justify-center gap-2 px-5 py-3 rounded-xl transition-all duration-300 ${!mealData.calories || Number(mealData.calories) === 0
-                      ? 'bg-gradient-to-r from-nutri-500 to-emerald-500 text-white shadow-lg shadow-nutri-500/30 hover:shadow-nutri-500/50 hover:scale-[1.02] animate-pulse'
-                      : 'bg-nutri-50 text-nutri-700 hover:bg-nutri-100 border border-nutri-200'
+                    disabled={isAnalyzing}
+                    className={`w-full font-medium flex items-center justify-center gap-2 px-5 py-3 rounded-xl transition-all duration-300 ${isAnalyzing
+                      ? 'bg-gradient-to-r from-nutri-500 to-emerald-500 text-white shadow-lg shadow-nutri-500/30 animate-pulse cursor-wait'
+                      : !mealData.calories || Number(mealData.calories) === 0
+                        ? 'bg-gradient-to-r from-nutri-500 to-emerald-500 text-white shadow-lg shadow-nutri-500/30 hover:shadow-nutri-500/50 hover:scale-[1.02]'
+                        : 'bg-nutri-50 text-nutri-700 hover:bg-nutri-100 border border-nutri-200'
                       }`}
                   >
-                    <Sparkles size={18} className={!mealData.calories || Number(mealData.calories) === 0 ? 'animate-spin' : ''} />
-                    <span>{!mealData.calories || Number(mealData.calories) === 0 ? 'Calcular Nutrientes com IA' : 'Recalcular com IA'}</span>
+                    <Sparkles size={18} className={isAnalyzing ? 'animate-spin' : ''} />
+                    <span>{isAnalyzing ? 'Calculando...' : (!mealData.calories || Number(mealData.calories) === 0 ? 'Calcular Nutrientes com IA' : 'Recalcular com IA')}</span>
                   </button>
                 </div>
               )}

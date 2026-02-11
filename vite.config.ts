@@ -1,7 +1,18 @@
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import express from 'express';
+import dotenv from 'dotenv';
+import geminiHandler from './api/gemini';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const root = path.resolve(__dirname);
+
+// Carrega variáveis de ambiente para a API (GEMINI_API_KEY, etc.) a partir da raiz do projeto
+dotenv.config({ path: path.join(root, '.env') });
+dotenv.config({ path: path.join(root, '.env.local'), override: true });
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
@@ -9,16 +20,38 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 3000,
       host: '0.0.0.0',
-      proxy: {
-        // Proxy API requests to local Express server durante development
-        '/api': {
-          target: 'http://localhost:3333',
-          changeOrigin: true,
-        },
-      },
     },
     plugins: [
       react(),
+      // API Gemini no mesmo processo (porta 3000) – sem proxy nem segundo processo
+      {
+        name: 'api-gemini',
+        configureServer(server) {
+          // Garante que GEMINI_API_KEY está em process.env (cwd pode ser outro ao carregar o config)
+          dotenv.config({ path: path.join(root, '.env') });
+          dotenv.config({ path: path.join(root, '.env.local'), override: true });
+          if (!process.env.GEMINI_API_KEY) {
+            console.warn('[api-gemini] GEMINI_API_KEY não encontrada em .env ou .env.local. A API de IA retornará 500.');
+          }
+          const apiApp = express();
+          apiApp.use(express.json({ limit: '10mb' }));
+          apiApp.options('/gemini', (_req, res) => {
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+            res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+            res.status(204).end();
+          });
+          apiApp.post('/gemini', async (req, res) => {
+            try {
+              await geminiHandler(req as any, res as any);
+            } catch (err) {
+              console.error('API Gemini error:', err);
+              res.status(500).json({ error: 'Internal Server Error' });
+            }
+          });
+          server.middlewares.use('/api', apiApp);
+        },
+      },
       VitePWA({
         registerType: 'autoUpdate',
         includeAssets: ['favicon.ico', 'icon-*.png', 'apple-touch-icon.png'],

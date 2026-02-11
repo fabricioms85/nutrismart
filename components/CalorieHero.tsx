@@ -69,9 +69,9 @@ const CalorieHero: React.FC<CalorieHeroProps> = ({ consumed, goal, burned, macro
 
                 {/* Right: Radial Hub */}
                 <div className="relative flex flex-col items-center justify-center">
-                    {/* Chart Container */}
-                    <div className="relative h-56 md:h-72 w-56 md:w-72">
-                        <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                    {/* Chart Container - min dimensions avoid Recharts warning on first paint */}
+                    <div className="relative h-56 md:h-72 w-56 md:w-72 min-h-[224px] min-w-[224px]">
+                        <ResponsiveContainer width="100%" height="100%" minWidth={224} minHeight={224}>
                             <PieChart>
                                 <Pie
                                     data={data}
