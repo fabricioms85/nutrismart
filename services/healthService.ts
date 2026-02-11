@@ -1,9 +1,9 @@
-
 import { supabase } from './supabaseClient';
 import { TABLE_DAILY_LOGS } from './statsService';
+import { getLocalDateString } from '../utils/dateUtils';
 
 export async function logSymptom(userId: string, symptom: string, severity: number, notes?: string): Promise<boolean> {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalDateString();
 
     // First check if a log exists for today
     const { data: existingLog } = await supabase

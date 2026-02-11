@@ -1,6 +1,7 @@
 
 import { supabase } from './supabaseClient';
 import { Achievement, Challenge } from '../types';
+import { getLocalDateString } from '../utils/dateUtils';
 
 // Constants for tables
 export const TABLE_USER_PROGRESS = 'user_progress';
@@ -118,7 +119,7 @@ export async function checkAchievements(userId: string, metrics: any) {
 }
 
 export async function getActiveChallenge(userId: string): Promise<Challenge | null> {
-  const today = new Date().toISOString().split('T')[0];
+  const today = getLocalDateString();
   const { data, error } = await supabase
     .from(TABLE_WEEKLY_CHALLENGES)
     .select('*')

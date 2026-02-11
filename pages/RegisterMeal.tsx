@@ -629,10 +629,10 @@ const RegisterMeal: React.FC<RegisterMealProps> = ({ onSave, onUpdate, onDelete 
   };
 
   return (
-    <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-8 pb-24 md:pb-0">
+    <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-8 pb-24 md:pb-0 overflow-x-hidden w-full box-border">
 
       {/* Header and Input Selection */}
-      <div className="bg-white md:rounded-2xl md:shadow-sm md:border border-gray-100 p-4 md:p-8 border-b md:border-b-0 space-y-6">
+      <div className="bg-white md:rounded-2xl md:shadow-sm md:border border-gray-100 p-4 md:p-8 border-b md:border-b-0 space-y-6 overflow-hidden">
         <div className="flex justify-between items-center">
           <h1 className="text-xl md:text-2xl font-bold text-gray-900 truncate pr-2">
             {editingId ? 'Editar Refeição' : 'Registrar Refeição'}
@@ -665,55 +665,52 @@ const RegisterMeal: React.FC<RegisterMealProps> = ({ onSave, onUpdate, onDelete 
         />
 
         {inputMode === 'none' && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full animate-fade-in">
+          <div className="grid grid-cols-2 gap-3 w-full animate-fade-in">
             {/* Camera Button: Full width on mobile (col-span-2), prominent */}
             <button
               onClick={() => cameraInputRef.current?.click()}
-              className="col-span-2 md:col-span-2 w-full flex flex-col md:flex-row items-center justify-center md:justify-start gap-3 md:gap-4 p-4 md:p-5 min-h-[100px] md:min-h-[120px] rounded-2xl bg-amber-gradient text-white shadow-lg shadow-orange-500/20 active:scale-[0.98] transition-all duration-200 group relative overflow-hidden"
+              className="col-span-2 w-full flex flex-col items-center justify-center gap-3 p-4 md:p-5 min-h-[100px] md:min-h-[120px] rounded-2xl bg-amber-gradient text-white shadow-lg shadow-orange-500/20 active:scale-[0.98] transition-all duration-200 group relative overflow-hidden"
             >
-              <div className="absolute top-0 right-0 p-3 opacity-10 rotate-12 transform scale-150 pointer-events-none hidden md:block">
-                <Camera size={80} />
+              <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform z-10 flex-shrink-0">
+                <Camera size={24} className="text-white" />
               </div>
-              <div className="w-12 h-12 md:w-14 md:h-14 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform z-10 flex-shrink-0">
-                <Camera size={24} className="text-white md:w-7 md:h-7" />
-              </div>
-              <div className="text-center md:text-left z-10 flex flex-col items-center md:items-start min-w-0 max-w-full overflow-hidden">
-                <span className="font-bold text-lg md:text-xl block leading-tight truncate w-full">Tirar Foto</span>
-                <span className="text-white/90 text-xs md:text-sm mt-0.5 truncate w-full">IA identifica o prato</span>
+              <div className="text-center z-10 flex flex-col items-center min-w-0 max-w-full">
+                <span className="font-bold text-lg block leading-tight">Tirar Foto</span>
+                <span className="text-white/90 text-xs mt-0.5">IA identifica o prato</span>
               </div>
             </button>
 
             {/* Gallery Button */}
             <button
               onClick={() => galleryInputRef.current?.click()}
-              className="col-span-1 md:col-span-1 w-full flex flex-col items-center justify-center gap-2 p-3 md:p-4 min-h-[90px] md:min-h-[120px] rounded-2xl border-2 border-teal-100 bg-teal-50 text-teal-700 active:scale-[0.98] transition-all duration-200 group overflow-hidden"
+              className="col-span-1 w-full flex flex-col items-center justify-center gap-2 p-3 md:p-4 min-h-[90px] md:min-h-[120px] rounded-2xl border-2 border-teal-100 bg-teal-50 text-teal-700 active:scale-[0.98] transition-all duration-200 group overflow-hidden"
             >
-              <div className="w-10 h-10 md:w-11 md:h-11 bg-white rounded-xl flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform flex-shrink-0">
-                <ImageIcon size={20} className="text-teal-600 md:w-[22px] md:h-[22px]" />
+              <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform flex-shrink-0">
+                <ImageIcon size={20} className="text-teal-600" />
               </div>
-              <span className="font-semibold text-xs md:text-sm text-center truncate w-full">Galeria</span>
+              <span className="font-semibold text-xs md:text-sm text-center">Galeria</span>
             </button>
 
             {/* Manual Button */}
             <button
               onClick={handleManualClick}
-              className="col-span-1 md:col-span-1 w-full flex flex-col items-center justify-center gap-2 p-3 md:p-4 min-h-[90px] md:min-h-[120px] rounded-2xl border-2 border-slate-200 bg-slate-50 text-slate-700 active:scale-[0.98] transition-all duration-200 group overflow-hidden"
+              className="col-span-1 w-full flex flex-col items-center justify-center gap-2 p-3 md:p-4 min-h-[90px] md:min-h-[120px] rounded-2xl border-2 border-slate-200 bg-slate-50 text-slate-700 active:scale-[0.98] transition-all duration-200 group overflow-hidden"
             >
-              <div className="w-10 h-10 md:w-11 md:h-11 bg-white rounded-xl flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform flex-shrink-0">
-                <PenTool size={20} className="text-slate-600 md:w-[22px] md:h-[22px]" />
+              <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform flex-shrink-0">
+                <PenTool size={20} className="text-slate-600" />
               </div>
-              <span className="font-semibold text-xs md:text-sm text-center truncate w-full">Manual</span>
+              <span className="font-semibold text-xs md:text-sm text-center">Manual</span>
             </button>
 
-            {/* Barcode Button: Full width on mobile to complete the grid nicely */}
+            {/* Barcode Button: Full width on mobile */}
             <button
               onClick={() => setShowBarcodeScanner(true)}
-              className="col-span-2 md:col-span-4 w-full flex flex-row items-center justify-center md:justify-start gap-3 p-3 md:p-4 min-h-[60px] md:min-h-[64px] rounded-xl md:rounded-2xl border-2 border-amber-200 bg-amber-50 text-amber-700 active:scale-[0.98] transition-all duration-200 group overflow-hidden"
+              className="col-span-2 w-full flex flex-row items-center justify-center gap-3 p-3 md:p-4 min-h-[52px] md:min-h-[64px] rounded-xl border-2 border-amber-200 bg-amber-50 text-amber-700 active:scale-[0.98] transition-all duration-200 group overflow-hidden"
             >
-              <div className="w-8 h-8 md:w-8 md:h-8 bg-white rounded-lg flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform flex-shrink-0">
+              <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform flex-shrink-0">
                 <ScanLine size={18} className="text-amber-600" />
               </div>
-              <span className="font-semibold text-sm truncate min-w-0 flex-1 text-center md:text-left">
+              <span className="font-semibold text-sm">
                 Escanear Código de Barras
               </span>
             </button>
@@ -1104,7 +1101,7 @@ const RegisterMeal: React.FC<RegisterMealProps> = ({ onSave, onUpdate, onDelete 
       </div>
 
       {/* History Section */}
-      <div className="bg-white md:rounded-2xl shadow-sm md:border border-gray-100 p-4 md:p-8 border-t md:border-t-0">
+      <div className="bg-white md:rounded-2xl shadow-sm md:border border-gray-100 p-4 md:p-8 border-t md:border-t-0 overflow-hidden">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
           <h2 className="text-lg md:text-xl font-bold text-gray-900 flex items-center gap-2">
             <History size={22} className="text-teal-500" />
@@ -1195,13 +1192,13 @@ const RegisterMeal: React.FC<RegisterMealProps> = ({ onSave, onUpdate, onDelete 
                         </div>
                       </div>
                       {/* Macros + Actions */}
-                      <div className="flex items-center gap-2 mt-2 pt-2 md:mt-2.5 md:pt-2.5 border-t border-gray-100/50">
-                        <div className="flex gap-1.5 flex-1 min-w-0 overflow-x-auto no-scrollbar">
+                      <div className="flex items-center gap-2 mt-2 pt-2 md:mt-2.5 md:pt-2.5 border-t border-gray-100/50 overflow-hidden">
+                        <div className="flex gap-1.5 flex-1 min-w-0 overflow-hidden">
                           <span className="text-[9px] md:text-[10px] font-medium px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 whitespace-nowrap">P:{meal.macros.protein}g</span>
                           <span className="text-[9px] md:text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 whitespace-nowrap">C:{meal.macros.carbs}g</span>
                           <span className="text-[9px] md:text-[10px] font-medium px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 whitespace-nowrap">G:{meal.macros.fats}g</span>
                         </div>
-                        <div className="flex gap-0.5">
+                        <div className="flex gap-0.5 flex-shrink-0">
                           <button onClick={(e) => { e.stopPropagation(); loadMealIntoForm(meal, 'copy'); }} className="p-1.5 md:p-2 rounded-lg text-gray-400 hover:text-teal-600 hover:bg-white transition" title="Duplicar"><Copy size={14} className="md:w-4 md:h-4" /></button>
                           <button onClick={(e) => { e.stopPropagation(); loadMealIntoForm(meal, 'edit'); }} className="p-1.5 md:p-2 rounded-lg text-gray-400 hover:text-amber-600 hover:bg-white transition" title="Editar"><Edit2 size={14} className="md:w-4 md:h-4" /></button>
                           <button

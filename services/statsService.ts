@@ -3,6 +3,7 @@ import { supabase } from './supabaseClient';
 import { TABLE_MEALS } from './mealService';
 
 import { DailyStats } from '../types';
+import { getLocalDateString } from '../utils/dateUtils';
 
 export const TABLE_DAILY_LOGS = 'daily_logs';
 
@@ -16,9 +17,9 @@ export async function getWeeklyStats(userId: string): Promise<WeeklyStatEntry[]>
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(today.getDate() - 6);
     sevenDaysAgo.setHours(0, 0, 0, 0);
-    const dateLimit = sevenDaysAgo.toISOString();
+    const dateLimit = getLocalDateString(sevenDaysAgo);
 
-    // Fetch Meals
+    // Fetch Meals (date column is YYYY-MM-DD)
     const { data: meals, error: mealsError } = await supabase
         .from(TABLE_MEALS)
         .select('*')
@@ -42,11 +43,11 @@ export async function getWeeklyStats(userId: string): Promise<WeeklyStatEntry[]>
 
     const statsMap: Record<string, DailyStats> = {};
 
-    // Initialize last 7 days
+    // Initialize last 7 days (local timezone)
     for (let i = 0; i < 7; i++) {
         const d = new Date();
         d.setDate(today.getDate() - i);
-        const dateStr = d.toISOString().split('T')[0];
+        const dateStr = getLocalDateString(d);
         statsMap[dateStr] = {
             caloriesConsumed: 0,
             caloriesBurned: 0,
@@ -57,9 +58,9 @@ export async function getWeeklyStats(userId: string): Promise<WeeklyStatEntry[]>
         };
     }
 
-    // Aggregate Meals
+    // Aggregate Meals (meal.date is already YYYY-MM-DD in local time)
     meals?.forEach((meal: any) => {
-        const dateStr = new Date(meal.date).toISOString().split('T')[0];
+        const dateStr = meal.date && String(meal.date).match(/^\d{4}-\d{2}-\d{2}$/) ? meal.date : getLocalDateString(new Date(meal.date));
         if (statsMap[dateStr]) {
             statsMap[dateStr].caloriesConsumed += meal.calories || 0;
             statsMap[dateStr].proteinConsumed += meal.protein || 0;
@@ -68,9 +69,9 @@ export async function getWeeklyStats(userId: string): Promise<WeeklyStatEntry[]>
         }
     });
 
-    // Aggregate Daily Logs (Water)
+    // Aggregate Daily Logs (Water) - log.date is YYYY-MM-DD
     logs?.forEach((log: any) => {
-        const dateStr = new Date(log.date).toISOString().split('T')[0];
+        const dateStr = log.date && String(log.date).match(/^\d{4}-\d{2}-\d{2}$/) ? log.date : getLocalDateString(new Date(log.date));
         if (statsMap[dateStr]) {
             statsMap[dateStr].waterConsumed += log.water_consumed || 0;
         }
