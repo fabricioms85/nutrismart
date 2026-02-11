@@ -1,4 +1,3 @@
-
 import React, { ErrorInfo, ReactNode } from 'react';
 
 interface Props {
@@ -21,13 +20,12 @@ class ErrorBoundary extends React.Component<Props, State> {
         };
     }
 
-    static getDerivedStateFromError(error: Error): State {
-        // Update state so the next render will show the fallback UI.
+    static getDerivedStateFromError(error: Error): Partial<State> {
         return { hasError: true, error, errorInfo: null };
     }
 
     componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-        console.error("Uncaught error:", error, errorInfo);
+        console.error('Erro não capturado:', error, errorInfo);
         this.setState({ error, errorInfo });
     }
 
@@ -35,26 +33,40 @@ class ErrorBoundary extends React.Component<Props, State> {
         if (this.state.hasError) {
             return (
                 <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-                    <div className="bg-white p-8 rounded-lg shadow-lg max-w-2xl w-full">
-                        <h1 className="text-2xl font-bold text-red-600 mb-4">Something went wrong</h1>
-                        <div className="bg-red-50 p-4 rounded border border-red-200 mb-4 overflow-auto max-h-60">
-                            <p className="font-mono text-sm text-red-800 break-words">
+                    <div className="bg-white p-8 rounded-3xl shadow-xl max-w-lg w-full text-center">
+                        <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                            <span className="text-3xl">⚠️</span>
+                        </div>
+                        <h1 className="text-xl font-bold text-gray-900 mb-2">Algo deu errado</h1>
+                        <p className="text-sm text-gray-500 mb-6">
+                            Ocorreu um erro inesperado. Tente recarregar a página ou voltar ao início.
+                        </p>
+
+                        <div className="bg-red-50 p-4 rounded-xl border border-red-100 mb-6 overflow-auto max-h-32 text-left">
+                            <p className="font-mono text-xs text-red-700 break-words">
                                 {this.state.error && this.state.error.toString()}
                             </p>
                         </div>
-                        <div className="text-sm text-gray-500 mb-6">
-                            <p>Please check the console for more details.</p>
+
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => { window.location.href = '/'; }}
+                                className="flex-1 py-3 border-2 border-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 transition-colors text-sm"
+                            >
+                                Voltar ao Início
+                            </button>
+                            <button
+                                onClick={() => window.location.reload()}
+                                className="flex-1 py-3 bg-nutri-500 text-white font-semibold rounded-xl hover:bg-nutri-600 transition-colors text-sm"
+                            >
+                                Recarregar Página
+                            </button>
                         </div>
-                        <button
-                            onClick={() => window.location.reload()}
-                            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-                        >
-                            Reload Page
-                        </button>
+
                         {this.state.errorInfo && (
-                            <details className="mt-4 text-xs text-gray-400">
-                                <summary>Stack Trace</summary>
-                                <pre className="mt-2 whitespace-pre-wrap">
+                            <details className="mt-4 text-xs text-gray-400 text-left">
+                                <summary className="cursor-pointer hover:text-gray-600">Detalhes técnicos</summary>
+                                <pre className="mt-2 whitespace-pre-wrap bg-gray-50 p-3 rounded-lg overflow-auto max-h-40">
                                     {this.state.errorInfo.componentStack}
                                 </pre>
                             </details>

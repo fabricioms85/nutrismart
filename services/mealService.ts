@@ -72,8 +72,7 @@ export async function addMeal(userId: string, meal: Omit<Meal, 'id'>): Promise<M
         .single();
 
     if (error) {
-        console.error('Error adding meal:', error);
-        return null;
+        throw new Error(`Falha ao adicionar refeição: ${error.message}`);
     }
     return mapToMeal(data);
 }
@@ -110,8 +109,7 @@ export async function deleteMeal(mealId: string): Promise<boolean> {
         .eq('id', mealId);
 
     if (error) {
-        console.error('Error deleting meal:', error);
-        return false;
+        throw new Error(`Falha ao excluir refeição: ${error.message}`);
     }
     return true;
 }

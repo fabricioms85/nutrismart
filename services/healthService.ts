@@ -27,8 +27,7 @@ export async function logSymptom(userId: string, symptom: string, severity: numb
             .eq('id', existingLog.id);
 
         if (error) {
-            console.error('Error logging symptom (update):', error);
-            return false;
+            throw new Error(`Falha ao registrar sintoma (atualização): ${error.message}`);
         }
     } else {
         // Create new log
@@ -42,8 +41,7 @@ export async function logSymptom(userId: string, symptom: string, severity: numb
             });
 
         if (error) {
-            console.error('Error logging symptom (insert):', error);
-            return false;
+            throw new Error(`Falha ao registrar sintoma: ${error.message}`);
         }
     }
 
@@ -71,8 +69,7 @@ export async function updateWaterConsumed(userId: string, date: string, amount: 
             .eq('id', existingLog.id);
 
         if (error) {
-            console.error('Error updating water:', error);
-            return false;
+            throw new Error(`Falha ao atualizar consumo de água: ${error.message}`);
         }
     } else {
         const { error } = await supabase
@@ -85,8 +82,7 @@ export async function updateWaterConsumed(userId: string, date: string, amount: 
             });
 
         if (error) {
-            console.error('Error logging water:', error);
-            return false;
+            throw new Error(`Falha ao registrar consumo de água: ${error.message}`);
         }
     }
     return true;

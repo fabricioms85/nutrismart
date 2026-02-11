@@ -1,13 +1,66 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
+/* ============================================
+   TAILWIND THEME CUSTOMIZATION (Tailwind v4)
+   Migrado de index.html inline config
+   ============================================ */
+@theme {
+  /* Font Families */
+  --font-sans: 'Inter', sans-serif;
+  --font-heading: 'Outfit', sans-serif;
+  --font-mono: 'Space Grotesk', monospace;
+
+  /* Border Radius */
+  --radius-3xl: 1.5rem;
+  --radius-4xl: 2rem;
+  --radius-5xl: 2.5rem;
+
+  /* Custom Colors - NutriSmart palette */
+  --color-nutri-50: #e6f8f2;
+  --color-nutri-100: #ccf1e6;
+  --color-nutri-200: #99e4ce;
+  --color-nutri-300: #66d7b5;
+  --color-nutri-400: #33ca9d;
+  --color-nutri-500: #00b37e;
+  --color-nutri-600: #00875f;
+  --color-nutri-700: #006d4c;
+  --color-nutri-800: #005239;
+  --color-nutri-900: #003826;
+
+  --color-solar-500: #FF6B6B;
+  --color-berry-500: #8338ec;
+
+  /* Animations */
+  --animate-fade-in: fade-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  --animate-blob: blob 7s infinite;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes blob {
+    0% { transform: translate(0px, 0px) scale(1); }
+    33% { transform: translate(30px, -50px) scale(1.1); }
+    66% { transform: translate(-20px, 20px) scale(0.9); }
+    100% { transform: translate(0px, 0px) scale(1); }
+  }
+}
+
+/* ============================================
+   BASE STYLES
+   ============================================ */
 :root {
   font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
 }
 
-/* Custom Utilities that might not be in the Tailwind CDN config */
-
+/* Custom Utilities */
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
@@ -34,7 +87,7 @@ body {
   max-width: 100vw;
 }
 
-/* Animation Utilities if not covered */
+/* Animation Utilities */
 .delay-100 {
   animation-delay: 100ms;
 }
@@ -47,13 +100,16 @@ body {
   animation-delay: 300ms;
 }
 
+.animation-delay-2000 {
+  animation-delay: 2s;
+}
+
 /* Meals Page - Mobile-First Animations */
 @keyframes fadeUp {
   from {
     opacity: 0;
     transform: translateY(16px);
   }
-
   to {
     opacity: 1;
     transform: translateY(0);
@@ -65,7 +121,6 @@ body {
     opacity: 0;
     transform: scale(0.95);
   }
-
   to {
     opacity: 1;
     transform: scale(1);
@@ -81,25 +136,13 @@ body {
 }
 
 /* Stagger delays for lists */
-.stagger-1 {
-  animation-delay: 50ms;
-}
-
-.stagger-2 {
-  animation-delay: 100ms;
-}
-
-.stagger-3 {
-  animation-delay: 150ms;
-}
-
-.stagger-4 {
-  animation-delay: 200ms;
-}
+.stagger-1 { animation-delay: 50ms; }
+.stagger-2 { animation-delay: 100ms; }
+.stagger-3 { animation-delay: 150ms; }
+.stagger-4 { animation-delay: 200ms; }
 
 /* Respect reduced motion preference */
 @media (prefers-reduced-motion: reduce) {
-
   .animate-fade-up,
   .animate-scale-in,
   .animate-fade-in {
@@ -108,30 +151,10 @@ body {
 }
 
 /* Coral/Amber/Teal Accent Colors */
-.bg-coral-500 {
-  background-color: #FF6B6B;
-}
-
-.bg-coral-600 {
-  background-color: #EE5A5A;
-}
-
-.text-coral-600 {
-  color: #EE5A5A;
-}
-
-.border-coral-200 {
-  border-color: #FECACA;
-}
-
-.bg-coral-50 {
-  background-color: #FEF2F2;
-}
-
-.bg-amber-gradient {
-  background: linear-gradient(135deg, #FF6B6B 0%, #F59E0B 100%);
-}
-
-.bg-teal-gradient {
-  background: linear-gradient(135deg, #0D9488 0%, #14B8A6 100%);
-}
+.bg-coral-500 { background-color: #FF6B6B; }
+.bg-coral-600 { background-color: #EE5A5A; }
+.text-coral-600 { color: #EE5A5A; }
+.border-coral-200 { border-color: #FECACA; }
+.bg-coral-50 { background-color: #FEF2F2; }
+.bg-amber-gradient { background: linear-gradient(135deg, #FF6B6B 0%, #F59E0B 100%); }
+.bg-teal-gradient { background: linear-gradient(135deg, #0D9488 0%, #14B8A6 100%); }

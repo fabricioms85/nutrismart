@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 import { Mail, Lock, User, Eye, EyeOff, Loader2, ArrowRight, Sparkles } from 'lucide-react';
+import LegalModal from '../components/legal/LegalModal';
+import TermsOfUseContent from '../components/legal/TermsOfUseContent';
+import PrivacyPolicyContent from '../components/legal/PrivacyPolicyContent';
 
 interface AuthPageProps {
     onSignIn: (email: string, password: string) => Promise<void>;
@@ -14,6 +17,8 @@ export default function AuthPage({ onSignIn, onSignUp }: AuthPageProps) {
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [showTerms, setShowTerms] = useState(false);
+    const [showPrivacy, setShowPrivacy] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -175,9 +180,24 @@ export default function AuthPage({ onSignIn, onSignUp }: AuthPageProps) {
 
                 {/* Footer */}
                 <p className="text-center text-gray-400 text-xs mt-8">
-                    Ao continuar, você concorda com nossos <a href="#" className="underline hover:text-nutri-600">Termos de Uso</a> e <a href="#" className="underline hover:text-nutri-600">Política de Privacidade</a>
+                    Ao continuar, você concorda com nossos{' '}
+                    <button type="button" onClick={() => setShowTerms(true)} className="underline hover:text-nutri-600 transition-colors">
+                        Termos de Uso
+                    </button>{' '}
+                    e{' '}
+                    <button type="button" onClick={() => setShowPrivacy(true)} className="underline hover:text-nutri-600 transition-colors">
+                        Política de Privacidade
+                    </button>
                 </p>
             </div>
+
+            {/* Legal Modals */}
+            <LegalModal isOpen={showTerms} onClose={() => setShowTerms(false)} title="Termos de Uso">
+                <TermsOfUseContent />
+            </LegalModal>
+            <LegalModal isOpen={showPrivacy} onClose={() => setShowPrivacy(false)} title="Política de Privacidade">
+                <PrivacyPolicyContent />
+            </LegalModal>
         </div>
     );
 }

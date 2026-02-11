@@ -84,12 +84,25 @@ const AiAssistant: React.FC<AiAssistantProps> = ({ user, stats, recentMeals }) =
             </div>
           </div>
           <div>
-            <h2 className="font-bold text-gray-900">Assistente NutriSmart</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="font-bold text-gray-900">Assistente NutriSmart</h2>
+              <span className="px-1.5 py-0.5 bg-nutri-100 text-nutri-700 text-[10px] font-bold rounded-md uppercase tracking-wider">
+                IA
+              </span>
+            </div>
             <p className="text-xs text-nutri-600 font-medium flex items-center gap-1">
               <span className="w-1.5 h-1.5 bg-nutri-500 rounded-full animate-pulse"></span>
               Conectado aos seus dados
             </p>
           </div>
+        </div>
+
+        {/* Disclaimer IA */}
+        <div className="px-4 py-2 bg-amber-50 border-b border-amber-100">
+          <p className="text-[10px] text-amber-700 text-center leading-tight">
+            As respostas são geradas por inteligência artificial e podem conter imprecisões.
+            Não substitui orientação de um profissional de saúde.
+          </p>
         </div>
 
         {/* Chat Area */}
@@ -107,6 +120,12 @@ const AiAssistant: React.FC<AiAssistantProps> = ({ user, stats, recentMeals }) =
                 {msg.text.split('\n').map((line, i) => (
                   <p key={i} className={i > 0 ? 'mt-2' : ''}>{line}</p>
                 ))}
+                {msg.role === 'assistant' && (
+                  <p className="text-[10px] text-gray-400 mt-2 flex items-center gap-1">
+                    <Sparkles size={10} className="text-gray-300" />
+                    Gerado por IA
+                  </p>
+                )}
               </div>
             </div>
           ))}
@@ -144,7 +163,7 @@ const AiAssistant: React.FC<AiAssistantProps> = ({ user, stats, recentMeals }) =
             </button>
           </div>
           <p className="text-[10px] text-center text-gray-400 mt-2">
-            O assistente tem acesso às suas refeições e metas de hoje para dar respostas precisas.
+            O assistente tem acesso às suas refeições e metas de hoje. Respostas geradas por IA.
           </p>
         </div>
       </div>

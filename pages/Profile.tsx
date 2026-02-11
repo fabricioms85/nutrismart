@@ -1,8 +1,12 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { User, Save, Camera, Mail, LogOut, Calculator, Scale, Ruler, Calendar, Target, Activity, Droplets, Flame, RefreshCw, Sparkles, Pill, Syringe, Settings2, Check, X, ChevronRight, TrendingDown, TrendingUp, Trophy, Flag } from 'lucide-react';
+import { User, Save, Camera, Mail, LogOut, Calculator, Scale, Ruler, Calendar, Target, Activity, Droplets, Flame, RefreshCw, Sparkles, Pill, Syringe, Settings2, Check, X, ChevronRight, TrendingDown, TrendingUp, Trophy, Flag, Shield } from 'lucide-react';
 import { User as UserType, ClinicalSettings, Meal, Symptom, WeightGoal, WeightEntry } from '../types';
 import ClinicalSetup from '../components/ClinicalSetup';
 import MedicalReportGenerator from '../components/MedicalReportGenerator';
+import DataExportButton from '../components/legal/DataExportButton';
+import DeleteAccountButton from '../components/legal/DeleteAccountButton';
+import SupportForm from '../components/SupportForm';
+import { useAuth } from '../contexts/AuthContext';
 import {
   Gender,
   Goal,
@@ -37,7 +41,9 @@ const goalInternalToDisplay: Record<string, string> = {
 };
 
 const Profile: React.FC<ProfileProps> = ({ user: initialUser, onUpdate, onSignOut, onToggleClinicalMode, meals = [], symptoms = [] }) => {
+  const { authUser, signOut } = useAuth();
   const [formData, setFormData] = useState(initialUser);
+  const [showSupport, setShowSupport] = useState(false);
   const [aggressiveness, setAggressiveness] = useState<Aggressiveness>('moderado');
   const [showRecalculateHint, setShowRecalculateHint] = useState(false);
   const [clinicalModeToggling, setClinicalModeToggling] = useState(false);
@@ -675,6 +681,37 @@ const Profile: React.FC<ProfileProps> = ({ user: initialUser, onUpdate, onSignOu
           </form>
         </div>
       </div>
+
+      {/* Seção LGPD - Seus Dados */}
+      {authUser && (
+        <div className="mt-10 pt-8 border-t border-gray-200">
+          <div className="flex items-center gap-2 mb-4">
+            <Shield size={20} className="text-gray-500" />
+            <h3 className="font-bold text-gray-900">Seus Dados (LGPD)</h3>
+          </div>
+          <p className="text-sm text-gray-500 mb-4">
+            Você tem direito de acessar, exportar e excluir todos os seus dados pessoais
+            armazenados no NutriSmart, conforme a Lei Geral de Proteção de Dados.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <DataExportButton userId={authUser.id} />
+            <DeleteAccountButton userId={authUser.id} onDeleted={signOut} />
+          </div>
+          <p className="text-xs text-gray-400 mt-4">
+            Dúvidas sobre seus dados?{' '}
+            <button
+              type="button"
+              onClick={() => setShowSupport(true)}
+              className="underline text-nutri-600 hover:text-nutri-700 transition-colors"
+            >
+              Fale com o suporte
+            </button>
+          </p>
+        </div>
+      )}
+
+      {/* Support Form Modal */}
+      <SupportForm isOpen={showSupport} onClose={() => setShowSupport(false)} />
 
       {/* Sign Out - Full width, clearly visible at the bottom */}
       {onSignOut && (

@@ -256,6 +256,15 @@ const Onboarding: React.FC<OnboardingProps> = ({ userName, onComplete }) => {
                                 <p className="text-sm text-gray-400 mt-2">Escolha o que melhor descreve sua jornada</p>
                             </div>
 
+                            {/* Disclaimer de Saúde */}
+                            <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl">
+                                <p className="text-xs text-amber-800 leading-relaxed text-center">
+                                    <strong>Aviso importante:</strong> O NutriSmart é uma ferramenta de apoio.
+                                    Não substitui orientação médica ou nutricional. Consulte um profissional
+                                    de saúde antes de fazer mudanças na sua dieta.
+                                </p>
+                            </div>
+
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {/* Lifestyle Option */}
                                 <button

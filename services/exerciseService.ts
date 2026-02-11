@@ -54,8 +54,7 @@ export async function addExercise(userId: string, exercise: Omit<Exercise, 'id'>
         .single();
 
     if (error) {
-        console.error('Error adding exercise:', error);
-        return null;
+        throw new Error(`Falha ao adicionar exercício: ${error.message}`);
     }
     return mapToExercise(data);
 }
@@ -68,8 +67,7 @@ export async function updateExercise(exerciseId: string, updates: Partial<Exerci
         .eq('id', exerciseId);
 
     if (error) {
-        console.error('Error updating exercise:', error);
-        return false;
+        throw new Error(`Falha ao atualizar exercício: ${error.message}`);
     }
     return true;
 }
@@ -81,8 +79,7 @@ export async function deleteExercise(exerciseId: string): Promise<boolean> {
         .eq('id', exerciseId);
 
     if (error) {
-        console.error('Error deleting exercise:', error);
-        return false;
+        throw new Error(`Falha ao excluir exercício: ${error.message}`);
     }
     return true;
 }

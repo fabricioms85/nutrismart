@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   LayoutDashboard,
   Utensils,
@@ -13,10 +13,12 @@ import {
   CreditCard,
   LogOut,
   ChevronRight,
-  Menu
+  Menu,
+  HelpCircle
 } from 'lucide-react';
 import { NavItem } from '../types';
 import { useAuth } from '../contexts/AuthContext';
+import SupportForm from './SupportForm';
 
 interface SidebarProps {
   activeItem: NavItem;
@@ -27,6 +29,7 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ activeItem, onNavigate, isOpen, setIsOpen }) => {
   const { profile, signOut } = useAuth();
+  const [showSupport, setShowSupport] = useState(false);
 
   const menuItems = [
     { id: NavItem.Dashboard, icon: LayoutDashboard, label: 'Dashboard' },
@@ -162,7 +165,14 @@ const Sidebar: React.FC<SidebarProps> = ({ activeItem, onNavigate, isOpen, setIs
         </div>
 
         {/* Footer Area - Bottom */}
-        <div className="p-6 pt-2">
+        <div className="p-6 pt-2 space-y-3">
+          <button
+            onClick={() => { setShowSupport(true); setIsOpen(false); }}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-xs font-bold text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-all duration-300"
+          >
+            <HelpCircle size={16} />
+            <span>Ajuda / Suporte</span>
+          </button>
           <button
             onClick={handleLogout}
             className="w-full flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl text-xs font-bold text-red-400 bg-red-50/50 hover:bg-red-50 hover:text-red-500 hover:scale-[1.02] transition-all duration-300"
@@ -170,7 +180,13 @@ const Sidebar: React.FC<SidebarProps> = ({ activeItem, onNavigate, isOpen, setIs
             <LogOut size={16} />
             <span>Sair da Conta</span>
           </button>
+          <p className="text-[10px] text-gray-400 text-center leading-tight px-2">
+            Ferramenta de apoio. Não substitui orientação médica ou nutricional.
+          </p>
         </div>
+
+        {/* Support Form Modal */}
+        <SupportForm isOpen={showSupport} onClose={() => setShowSupport(false)} />
 
       </aside>
     </>

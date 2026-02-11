@@ -12,6 +12,62 @@ const supabase = SUPABASE_URL && SUPABASE_ANON_KEY
     ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
     : null;
 
+// CORS origin (restrito em prod, aberto em dev)
+const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || '*';
+
+// =====================================================
+// RATE LIMITING (in-memory, per serverless instance)
+// Em prod na Vercel cada cold start reseta; suficiente para MVP.
+// Para escala, migrar para Redis/Upstash.
+// =====================================================
+interface RateLimitEntry {
+    count: number;
+    resetAt: number;
+}
+
+const rateLimitMap = new Map<string, RateLimitEntry>();
+
+// Limites por action (requests por hora)
+const RATE_LIMITS: Record<string, number> = {
+    'analyze-food': 20,
+    'chat': 60,
+    'calculate-nutrition': 30,
+    'generate-meal-plan': 15,
+    'generate-recipes': 15,
+    'generate-shopping-list': 15,
+    'generate-clinical-summary': 10,
+};
+const DEFAULT_RATE_LIMIT = 30;
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hora
+
+function checkRateLimit(key: string, action: string): { allowed: boolean; remaining: number } {
+    const now = Date.now();
+    const limit = RATE_LIMITS[action] || DEFAULT_RATE_LIMIT;
+    const fullKey = `${key}:${action}`;
+    const entry = rateLimitMap.get(fullKey);
+
+    if (!entry || now > entry.resetAt) {
+        rateLimitMap.set(fullKey, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+        return { allowed: true, remaining: limit - 1 };
+    }
+
+    if (entry.count >= limit) {
+        return { allowed: false, remaining: 0 };
+    }
+
+    entry.count++;
+    return { allowed: true, remaining: limit - entry.count };
+}
+
+function getRateLimitKey(req: { headers: Record<string, string | string[] | undefined>; body?: { payload?: { userId?: string } } }): string {
+    // Preferir userId se autenticado, senão IP
+    const userId = req.body?.payload?.userId;
+    if (userId && typeof userId === 'string') return `user:${userId}`;
+    const forwarded = req.headers['x-forwarded-for'];
+    const ip = typeof forwarded === 'string' ? forwarded.split(',')[0].trim() : (req.headers['x-real-ip'] as string) || 'unknown';
+    return `ip:${ip}`;
+}
+
 interface GeminiRequest {
     action: 'chat' | 'analyze-food' | 'calculate-nutrition' | 'generate-meal-plan' | 'generate-recipes' | 'generate-shopping-list' | 'generate-clinical-summary';
     payload: Record<string, unknown>;
@@ -550,8 +606,8 @@ Retorne apenas o texto do resumo, sem formatação especial.`;
 
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-    // CORS headers
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    // CORS headers (restrito em prod via env var ALLOWED_ORIGIN)
+    res.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
@@ -571,6 +627,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     try {
         const { action, payload } = req.body as GeminiRequest;
+
+        // Rate limiting
+        const rateLimitKey = getRateLimitKey(req as any);
+        const { allowed, remaining } = checkRateLimit(rateLimitKey, action);
+        res.setHeader('X-RateLimit-Remaining', remaining.toString());
+
+        if (!allowed) {
+            return res.status(429).json({
+                error: 'Você atingiu o limite de requisições. Aguarde alguns minutos e tente novamente.'
+            });
+        }
 
         let result: string;
 
