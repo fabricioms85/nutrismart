@@ -629,10 +629,10 @@ const RegisterMeal: React.FC<RegisterMealProps> = ({ onSave, onUpdate, onDelete 
   };
 
   return (
-    <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-8 pb-24 md:pb-0">
+    <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-8 pb-24 md:pb-0 overflow-x-hidden w-full box-border">
 
       {/* Header and Input Selection */}
-      <div className="bg-white md:rounded-2xl md:shadow-sm md:border border-gray-100 p-4 md:p-8 border-b md:border-b-0 space-y-6">
+      <div className="bg-white md:rounded-2xl md:shadow-sm md:border border-gray-100 p-4 md:p-8 border-b md:border-b-0 space-y-6 overflow-hidden">
         <div className="flex justify-between items-center">
           <h1 className="text-xl md:text-2xl font-bold text-gray-900 truncate pr-2">
             {editingId ? 'Editar Refeição' : 'Registrar Refeição'}
@@ -1104,7 +1104,7 @@ const RegisterMeal: React.FC<RegisterMealProps> = ({ onSave, onUpdate, onDelete 
       </div>
 
       {/* History Section */}
-      <div className="bg-white md:rounded-2xl shadow-sm md:border border-gray-100 p-4 md:p-8 border-t md:border-t-0">
+      <div className="bg-white md:rounded-2xl shadow-sm md:border border-gray-100 p-4 md:p-8 border-t md:border-t-0 overflow-hidden">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
           <h2 className="text-lg md:text-xl font-bold text-gray-900 flex items-center gap-2">
             <History size={22} className="text-teal-500" />

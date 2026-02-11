@@ -47,7 +47,7 @@ const AppLayout: React.FC<{ children: React.ReactNode; currentPath: NavItem; onN
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex font-sans">
+    <div className="min-h-screen bg-[#F8FAFC] flex font-sans overflow-x-hidden max-w-[100vw]">
       <Sidebar
         activeItem={currentPath}
         onNavigate={onNavigate}
@@ -55,7 +55,7 @@ const AppLayout: React.FC<{ children: React.ReactNode; currentPath: NavItem; onN
         setIsOpen={setIsSidebarOpen}
       />
 
-      <div className="flex-1 lg:ml-72 flex flex-col min-h-screen transition-all duration-500 ease-in-out">
+      <div className="flex-1 lg:ml-72 flex flex-col min-h-screen transition-all duration-500 ease-in-out overflow-x-hidden min-w-0">
         <div className="lg:hidden p-4 bg-white/80 backdrop-blur-md border-b border-gray-100 flex items-center justify-between sticky top-0 z-10 shadow-sm">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-gradient-to-br from-nutri-500 to-nutri-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-nutri-500/20">
@@ -68,14 +68,14 @@ const AppLayout: React.FC<{ children: React.ReactNode; currentPath: NavItem; onN
           </button>
         </div>
 
-        <main className="flex-1 relative overflow-y-auto w-full">
+        <main className="flex-1 relative overflow-y-auto w-full overflow-x-hidden">
           {/* Background Blobs for Pages - Contained to prevent overflow */}
           <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
             <div className="absolute top-0 right-0 w-[40rem] h-[40rem] bg-nutri-50/50 rounded-full mix-blend-multiply filter blur-3xl opacity-40 -translate-y-1/2 translate-x-1/2" />
             <div className="absolute bottom-0 left-0 w-[40rem] h-[40rem] bg-blue-50/50 rounded-full mix-blend-multiply filter blur-3xl opacity-40 translate-y-1/3 -translate-x-1/3" />
           </div>
 
-          <div className="relative z-10 w-full max-w-full">
+          <div className="relative z-10 w-full max-w-full overflow-x-hidden">
             {children}
           </div>
         </main>
