@@ -70,6 +70,8 @@ export interface User {
   // Weight Goal Journey fields
   weightGoal?: WeightGoal;
   weightHistory?: WeightEntry[];
+  // Exercise calories: none = don't add to remaining, half = 50%, full = 100%
+  addExerciseCaloriesToRemaining?: 'none' | 'half' | 'full';
 }
 
 

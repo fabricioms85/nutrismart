@@ -57,14 +57,14 @@ export async function getWeeklyStats(userId: string): Promise<WeeklyStatEntry[]>
         };
     }
 
-    // Aggregate Meals
+    // Aggregate Meals (DB retorna macro_protein/macro_carbs/macro_fats; Meal type usa macros.protein etc.)
     meals?.forEach((meal: any) => {
         const dateStr = new Date(meal.date).toISOString().split('T')[0];
         if (statsMap[dateStr]) {
             statsMap[dateStr].caloriesConsumed += meal.calories || 0;
-            statsMap[dateStr].proteinConsumed += meal.protein || 0;
-            statsMap[dateStr].carbsConsumed += meal.carbs || 0;
-            statsMap[dateStr].fatsConsumed += meal.fats || 0;
+            statsMap[dateStr].proteinConsumed += meal.macro_protein ?? meal.macros?.protein ?? meal.protein ?? 0;
+            statsMap[dateStr].carbsConsumed += meal.macro_carbs ?? meal.macros?.carbs ?? meal.carbs ?? 0;
+            statsMap[dateStr].fatsConsumed += meal.macro_fats ?? meal.macros?.fats ?? meal.fats ?? 0;
         }
     });
 

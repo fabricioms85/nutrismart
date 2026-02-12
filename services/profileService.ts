@@ -27,6 +27,7 @@ function mapToUser(row: any): User {
         isClinicalMode: row.is_clinical_mode,
         clinicalSettings: row.clinical_settings ? (typeof row.clinical_settings === 'string' ? JSON.parse(row.clinical_settings) : row.clinical_settings) : undefined,
         weightGoal: row.weight_goal ? (typeof row.weight_goal === 'string' ? JSON.parse(row.weight_goal) : row.weight_goal) : undefined,
+        addExerciseCaloriesToRemaining: row.add_exercise_calories_to_remaining ?? undefined,
     };
 }
 
@@ -57,6 +58,7 @@ function mapToDB(user: Partial<User>): any {
     if (user.isClinicalMode !== undefined) dbRow.is_clinical_mode = user.isClinicalMode;
     if (user.clinicalSettings !== undefined) dbRow.clinical_settings = user.clinicalSettings;
     if (user.weightGoal !== undefined) dbRow.weight_goal = user.weightGoal;
+    if (user.addExerciseCaloriesToRemaining !== undefined) dbRow.add_exercise_calories_to_remaining = user.addExerciseCaloriesToRemaining;
 
     return dbRow;
 }

@@ -242,7 +242,14 @@ CAPACIDADES:
     if (context) {
         const { user, stats, recentMeals } = context;
         const mealsSummary = recentMeals.map(m => `${m.name} (${m.calories}kcal)`).join(', ');
-        const caloriesRemaining = user.dailyCalorieGoal - stats.caloriesConsumed;
+        // Align with dashboard: exercise calories mode (none for weight loss/clinical, half/full by preference)
+        const rawGoal = user.goal;
+        const goal = !rawGoal ? undefined : (rawGoal === 'perder_peso' || rawGoal === 'Perder Peso' ? 'perder_peso' : rawGoal === 'ganhar_massa' || rawGoal === 'Ganhar Massa Muscular' ? 'ganhar_massa' : rawGoal === 'manter_peso' || rawGoal === 'Manter Peso' ? 'manter_peso' : rawGoal);
+        const isClinical = user.isClinicalMode;
+        const pref = (user as { addExerciseCaloriesToRemaining?: 'none' | 'half' | 'full' }).addExerciseCaloriesToRemaining;
+        const mode = (isClinical || goal === 'perder_peso') ? 'none' : (pref ?? (goal === 'ganhar_massa' ? 'half' : 'full'));
+        const toAdd = mode === 'none' ? 0 : mode === 'half' ? stats.caloriesBurned * 0.5 : stats.caloriesBurned;
+        const caloriesRemaining = Math.max(0, user.dailyCalorieGoal - stats.caloriesConsumed + toAdd);
         const waterProgress = Math.round((stats.waterConsumed / user.dailyWaterGoal) * 100);
 
         systemInstruction += `

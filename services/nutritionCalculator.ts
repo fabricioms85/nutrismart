@@ -459,15 +459,19 @@ export function getGoalLabel(goal: Goal): string {
 }
 
 /**
- * Calculate daily statistics from a list of meals
+ * Calculate daily statistics from a list of meals.
+ * Supports both meal.macros (protein/carbs/fats) and legacy meal.protein/carbs/fats.
  */
 export function calculateDailyStats(meals: any[]): { caloriesConsumed: number; proteinConsumed: number; carbsConsumed: number; fatsConsumed: number } {
     return meals.reduce((acc, meal) => {
+        const protein = meal.macros?.protein ?? meal.protein ?? 0;
+        const carbs = meal.macros?.carbs ?? meal.carbs ?? 0;
+        const fats = meal.macros?.fats ?? meal.fats ?? 0;
         return {
             caloriesConsumed: acc.caloriesConsumed + (meal.calories || 0),
-            proteinConsumed: acc.proteinConsumed + (meal.protein || 0),
-            carbsConsumed: acc.carbsConsumed + (meal.carbs || 0),
-            fatsConsumed: acc.fatsConsumed + (meal.fats || 0)
+            proteinConsumed: acc.proteinConsumed + protein,
+            carbsConsumed: acc.carbsConsumed + carbs,
+            fatsConsumed: acc.fatsConsumed + fats
         };
     }, {
         caloriesConsumed: 0,

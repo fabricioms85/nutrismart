@@ -2,12 +2,14 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Area, AreaChart, ReferenceLine } from 'recharts';
 import { TrendingUp, TrendingDown, Plus, Calendar, Target, Flame, Activity, ChevronDown, Share2, Download, Loader2, Trophy, Zap, Flag } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 import { getWeightHistory, addWeightEntry } from '../services/weightService';
+import { updateProfile } from '../services/profileService';
 import { calculateStreak } from '../services/gamificationService';
 import { getWeeklyStats } from '../services/statsService';
 import { getMeals } from '../services/mealService';
 
-import { generateWeeklySummaryImage, shareImage, getWeekRange, isShareSupported } from '../services/shareService';
+import { generateWeeklySummaryImage, shareImage, getWeekRange, getPeriodLabel, isShareSupported } from '../services/shareService';
 import WeightModal from '../components/WeightModal';
 import { WeightGoal } from '../types';
 
@@ -25,7 +27,8 @@ interface CalorieEntry {
 type PeriodFilter = 7 | 14 | 30 | 90;
 
 const Progress: React.FC = () => {
-  const { authUser, profile } = useAuth();
+  const { authUser, profile, refreshProfile } = useAuth();
+  const toast = useToast();
   const [weightHistory, setWeightHistory] = useState<WeightEntry[]>([]);
   const [calorieHistory, setCalorieHistory] = useState<CalorieEntry[]>([]);
   const [streak, setStreak] = useState(0);
@@ -43,15 +46,13 @@ const Progress: React.FC = () => {
     setLoading(true);
 
     try {
-      // Fetch weight history
+      // Fetch weight history (getWeightHistory já retorna ascending: mais antigo primeiro)
       const weightData = await getWeightHistory(authUser.id, period);
-      // Reverse to show oldest first for chart
-      const reversedWeight = [...weightData].reverse();
 
-      // Format dates for display
-      const formattedWeight = reversedWeight.map(entry => ({
+      // Formatar para o gráfico: esquerda = mais antigo, direita = mais recente
+      const formattedWeight = weightData.map(entry => ({
         day: formatDate(entry.date),
-        weight: entry.weight,
+        weight: Number(entry.weight),
       }));
       setWeightHistory(formattedWeight);
 
@@ -94,9 +95,13 @@ const Progress: React.FC = () => {
 
   const handleAddWeight = async (weight: number, date: string) => {
     if (!authUser) return;
-    const success = await addWeightEntry(authUser.id, weight, date);
-    if (success) {
+    try {
+      await addWeightEntry(authUser.id, weight, date);
+      await updateProfile(authUser.id, { weight });
+      await refreshProfile();
       await fetchData();
+    } catch (err) {
+      console.error('Erro ao salvar peso:', err);
     }
   };
 
@@ -175,17 +180,37 @@ const Progress: React.FC = () => {
   }
 
   const handleShare = async () => {
-    if (!profile) return;
+    const showError = (msg: string) => {
+      try {
+        toast.error(msg);
+      } catch {
+        alert(msg);
+      }
+    };
+    const showSuccess = (msg: string) => {
+      try {
+        toast.success(msg);
+      } catch {
+        alert(msg);
+      }
+    };
+
+    if (!profile) {
+      showError('Carregue seu perfil para compartilhar.');
+      return;
+    }
+
     setIsSharing(true);
 
     try {
       const summaryData = {
         userName: profile.name || 'Usuário NutriSmart',
-        weekRange: getWeekRange(),
+        weekRange: getWeekRange(period),
+        periodLabel: getPeriodLabel(period),
         caloriesAvg: avgCalories,
         caloriesGoal: calorieGoal,
         waterAvg: totalWater,
-        waterGoal: profile.dailyWaterGoal,
+        waterGoal: profile.dailyWaterGoal ?? 2500,
         exerciseMinutes: totalExerciseMinutes,
         weightChange: weightChange,
         streak: streak,
@@ -193,9 +218,16 @@ const Progress: React.FC = () => {
       };
 
       const blob = await generateWeeklySummaryImage(summaryData);
-      await shareImage(blob);
+      const shared = await shareImage(blob);
+
+      if (shared) {
+        showSuccess('Resumo compartilhado!');
+      } else {
+        showSuccess('Imagem gerada! Se o download não iniciou, verifique a pasta de downloads ou permita pop-ups para este site.');
+      }
     } catch (error) {
       console.error('Error sharing:', error);
+      showError('Não foi possível gerar a imagem. Tente novamente.');
     } finally {
       setIsSharing(false);
     }
@@ -210,8 +242,10 @@ const Progress: React.FC = () => {
         <div className="flex items-center gap-3">
           {/* Share Button */}
           <button
+            type="button"
             onClick={handleShare}
             disabled={isSharing}
+            aria-busy={isSharing}
             className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-nutri-500 to-nutri-600 text-white font-medium rounded-xl hover:shadow-lg hover:shadow-nutri-500/30 transition-all disabled:opacity-50"
           >
             {isSharing ? (

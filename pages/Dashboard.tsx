@@ -27,6 +27,7 @@ import { logSymptom } from '../services/healthService';
 import { addWeightEntry } from '../services/weightService';
 import { updateProfile } from '../services/profileService';
 import { getLocalDateString } from '../utils/dateUtils';
+import { getExerciseCaloriesToAdd } from '../utils/calorieRemaining';
 import WeightInsightsCard from '../components/WeightInsightsCard';
 import MilestoneModal from '../components/MilestoneModal';
 
@@ -43,7 +44,7 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ user, userId, stats, updateWater, recentMeals, recentExercises, onNavigate, streak, weeklyStats }) => {
-  const [weight, setWeight] = useState<string>('');
+  const [weight, setWeight] = useState<string>(() => (user?.weight != null ? String(user.weight) : ''));
   const [challenge, setChallenge] = useState<Challenge | null>(null);
   const [showSymptomModal, setShowSymptomModal] = useState(false);
   const [isSavingWeight, setIsSavingWeight] = useState(false);
@@ -156,42 +157,42 @@ const Dashboard: React.FC<DashboardProps> = ({ user, userId, stats, updateWater,
     return false;
   };
 
-  // Save weight directly with current date/time
+  // Save weight: grava em weight_history e atualiza profile.weight para ficar igual ao Progresso
   const handleSaveWeight = async () => {
-    const weightValue = parseFloat(weight) || user.weight;
-    if (!weightValue || weightValue <= 0) return;
+    const weightValue = parseFloat(weight);
+    if (Number.isNaN(weightValue) || weightValue <= 0) return;
 
     setIsSavingWeight(true);
     const today = getLocalDateString();
-    const success = await addWeightEntry(userId, weightValue, today);
+    try {
+      await addWeightEntry(userId, weightValue, today);
+      await updateProfile(userId, { weight: weightValue });
+    } catch (err) {
+      setIsSavingWeight(false);
+      return;
+    }
 
-    if (success) {
-      setWeightSaved(true);
+    setWeightSaved(true);
 
-      // Check weight badges based on progress
-      if (user.weightGoal && user.weightGoal.status === 'active') {
-        checkWeightBadges({
-          currentWeight: weightValue,
-          startWeight: user.weightGoal.startWeight,
-          targetWeight: user.weightGoal.targetWeight,
-          weightHistoryLength: user.weightHistory?.length || 0,
-          consecutiveWeighInDays: user.weightHistory ? Math.min(14, user.weightHistory.length) : 0
-        });
-      }
+    if (user.weightGoal && user.weightGoal.status === 'active') {
+      checkWeightBadges({
+        currentWeight: weightValue,
+        startWeight: user.weightGoal.startWeight,
+        targetWeight: user.weightGoal.targetWeight,
+        weightHistoryLength: user.weightHistory?.length || 0,
+        consecutiveWeighInDays: user.weightHistory ? Math.min(14, user.weightHistory.length) : 0
+      });
+    }
 
-      // Check milestones
-      const milestoneReached = await checkMilestones(weightValue);
+    const milestoneReached = await checkMilestones(weightValue);
 
-      if (!milestoneReached) {
-        // Only reload if no milestone modal is shown
-        // If modal is shown, reload will happen on modal close
-        setTimeout(() => {
-          setWeightSaved(false);
-          window.location.reload();
-        }, 1500);
-      } else {
+    if (!milestoneReached) {
+      setTimeout(() => {
         setWeightSaved(false);
-      }
+        window.location.reload();
+      }, 1500);
+    } else {
+      setWeightSaved(false);
     }
     setIsSavingWeight(false);
   };
@@ -297,6 +298,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, userId, stats, updateWater,
             consumed={stats.caloriesConsumed}
             goal={user.dailyCalorieGoal}
             burned={stats.caloriesBurned}
+            exerciseCaloriesMode={getExerciseCaloriesToAdd(user.goal, user.isClinicalMode, user.addExerciseCaloriesToRemaining)}
             macros={{
               protein: { current: stats.proteinConsumed, total: user.macros.protein },
               carbs: { current: stats.carbsConsumed, total: user.macros.carbs },
@@ -425,11 +427,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, userId, stats, updateWater,
                   <div className="relative group/input">
                     <input
                       type="number"
-                      value={weight || user.weight || ''}
-                      placeholder={user.weight?.toString() || 'Digite seu peso'}
+                      value={weight}
+                      placeholder={user.weight != null ? String(user.weight) : 'Digite seu peso'}
                       onChange={(e) => setWeight(e.target.value)}
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter' && weight) {
+                        if (e.key === 'Enter' && parseFloat(weight) > 0) {
                           handleSaveWeight();
                         }
                       }}
@@ -441,7 +443,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, userId, stats, updateWater,
                 </div>
                 <button
                   onClick={handleSaveWeight}
-                  disabled={isSavingWeight || weightSaved}
+                  disabled={isSavingWeight || weightSaved || !weight.trim() || parseFloat(weight) <= 0}
                   className={`w-16 h-16 rounded-2xl flex items-center justify-center transition-all duration-300 shadow-xl active:scale-95 ${weightSaved
                     ? 'bg-green-500 text-white shadow-green-500/20'
                     : 'bg-gray-900 text-white hover:bg-black hover:scale-110 hover:rotate-90 shadow-gray-900/20'

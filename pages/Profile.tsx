@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { User, Save, Camera, Mail, LogOut, Calculator, Scale, Ruler, Calendar, Target, Activity, Droplets, Flame, RefreshCw, Sparkles, Pill, Syringe, Settings2, Check, X, ChevronRight, TrendingDown, TrendingUp, Trophy, Flag, Shield } from 'lucide-react';
+import { User, Save, Camera, Mail, LogOut, Calculator, Scale, Ruler, Calendar, Target, Activity, Droplets, Flame, RefreshCw, Sparkles, Pill, Syringe, Settings2, Check, X, ChevronRight, TrendingDown, TrendingUp, Trophy, Flag, Shield, Loader2 } from 'lucide-react';
 import { User as UserType, ClinicalSettings, Meal, Symptom, WeightGoal, WeightEntry } from '../types';
 import ClinicalSetup from '../components/ClinicalSetup';
 import MedicalReportGenerator from '../components/MedicalReportGenerator';
 import DataExportButton from '../components/legal/DataExportButton';
 import DeleteAccountButton from '../components/legal/DeleteAccountButton';
 import SupportForm from '../components/SupportForm';
+import { updateAvatar } from '../services/storageService';
 import { useAuth } from '../contexts/AuthContext';
 import {
   Gender,
@@ -41,39 +42,43 @@ const goalInternalToDisplay: Record<string, string> = {
 };
 
 const Profile: React.FC<ProfileProps> = ({ user: initialUser, onUpdate, onSignOut, onToggleClinicalMode, meals = [], symptoms = [] }) => {
-  const { authUser, signOut } = useAuth();
+  const { authUser, signOut, refreshProfile } = useAuth();
   const [formData, setFormData] = useState(initialUser);
   const [showSupport, setShowSupport] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
   const [aggressiveness, setAggressiveness] = useState<Aggressiveness>('moderado');
   const [showRecalculateHint, setShowRecalculateHint] = useState(false);
   const [clinicalModeToggling, setClinicalModeToggling] = useState(false);
   const [isEditingClinical, setIsEditingClinical] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Handle avatar upload
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle avatar upload: envia para Supabase Storage e atualiza o perfil (persiste após reload)
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !authUser) return;
 
-    // Validate file type
     if (!file.type.startsWith('image/')) {
       alert('Por favor, selecione uma imagem válida.');
       return;
     }
-
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       alert('A imagem deve ter no máximo 5MB.');
       return;
     }
 
-    // Convert to base64 for local storage
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64String = reader.result as string;
-      setFormData(prev => ({ ...prev, avatarUrl: base64String }));
-    };
-    reader.readAsDataURL(file);
+    setAvatarUploading(true);
+    try {
+      const url = await updateAvatar(file, authUser.id);
+      setFormData(prev => ({ ...prev, avatarUrl: url }));
+      await refreshProfile();
+      onUpdate({ ...formData, avatarUrl: url });
+    } catch (err) {
+      console.error('Erro ao enviar foto:', err);
+      alert('Não foi possível salvar a foto. Tente novamente.');
+    } finally {
+      setAvatarUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   // Track if physical data changed to show recalculate hint
@@ -158,17 +163,24 @@ const Profile: React.FC<ProfileProps> = ({ user: initialUser, onUpdate, onSignOu
                   alt="Profile"
                   className="w-28 h-28 rounded-full object-cover border-4 border-nutri-100 shadow-lg"
                 />
+                {avatarUploading && (
+                  <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40">
+                    <Loader2 size={24} className="text-white animate-spin" />
+                  </div>
+                )}
                 <input
                   ref={fileInputRef}
                   type="file"
                   accept="image/*"
                   onChange={handleAvatarChange}
                   className="hidden"
+                  disabled={avatarUploading}
                 />
                 <button
                   type="button"
+                  disabled={avatarUploading}
                   onClick={() => fileInputRef.current?.click()}
-                  className="absolute bottom-0 right-0 bg-nutri-500 text-white p-2.5 rounded-full shadow-lg hover:bg-nutri-600 transition-all hover:scale-110"
+                  className="absolute bottom-0 right-0 bg-nutri-500 text-white p-2.5 rounded-full shadow-lg hover:bg-nutri-600 transition-all hover:scale-110 disabled:opacity-70"
                 >
                   <Camera size={16} />
                 </button>
@@ -346,6 +358,26 @@ const Profile: React.FC<ProfileProps> = ({ user: initialUser, onUpdate, onSignOu
                   </select>
                 </div>
               </div>
+
+              {/* Repor calorias de treino - apenas para ganhar_massa ou manter_peso */}
+              {(formData.goal === 'Ganhar Massa Muscular' || formData.goal === 'Manter Peso' || formData.goal === 'ganhar_massa' || formData.goal === 'manter_peso') && (
+                <div className="mt-5">
+                  <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                    <Flame size={16} className="text-orange-500" />
+                    Repor calorias de treino?
+                  </label>
+                  <select
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-nutri-500 focus:ring-2 focus:ring-nutri-100 outline-none transition bg-white font-medium"
+                    value={formData.addExerciseCaloriesToRemaining ?? ((formData.goal === 'Ganhar Massa Muscular' || formData.goal === 'ganhar_massa') ? 'half' : 'full')}
+                    onChange={(e) => setFormData({ ...formData, addExerciseCaloriesToRemaining: e.target.value as 'none' | 'half' | 'full' })}
+                  >
+                    <option value="none">Não</option>
+                    <option value="half">50% (recomendado para ganho de massa)</option>
+                    <option value="full">100% (apenas atletas de alto rendimento)</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1.5">Recomendado apenas para atletas na opção 100%.</p>
+                </div>
+              )}
 
               {/* Recalculate Hint */}
               {showRecalculateHint && (

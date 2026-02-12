@@ -56,6 +56,7 @@ export interface OnboardingData {
     // Weight goal fields (optional)
     weightGoal?: WeightGoal;
     weightHistory?: WeightEntry[];
+    addExerciseCaloriesToRemaining?: 'none' | 'half' | 'full';
 }
 
 const Onboarding: React.FC<OnboardingProps> = ({ userName, onComplete }) => {
@@ -182,7 +183,8 @@ const Onboarding: React.FC<OnboardingProps> = ({ userName, onComplete }) => {
                 isClinicalMode,
                 clinicalSettings,
                 weightGoal: weightGoalData,
-                weightHistory: weight > 0 ? [{ date: getLocalDateString(), weight, source: 'manual' as const }] : []
+                weightHistory: weight > 0 ? [{ date: getLocalDateString(), weight, source: 'manual' as const }] : [],
+                ...(goal === 'ganhar_massa' && { addExerciseCaloriesToRemaining: 'half' as const })
             });
         } finally {
             setIsSubmitting(false);

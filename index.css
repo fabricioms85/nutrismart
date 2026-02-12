@@ -29,6 +29,7 @@
 
   --color-solar-500: #FF6B6B;
   --color-berry-500: #8338ec;
+  --color-calorie-alert: rgba(230, 11, 0, 1);
 
   /* Animations */
   --animate-fade-in: fade-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
