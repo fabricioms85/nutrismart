@@ -87,8 +87,9 @@ const Progress: React.FC = () => {
     fetchData();
   }, [fetchData]);
 
+  // Parse YYYY-MM-DD as local date (evita dia anterior em fusos UTC− como Brasil)
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
+    const date = new Date(dateStr + 'T12:00:00');
     const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
     return days[date.getDay()] + ' ' + date.getDate();
   };
