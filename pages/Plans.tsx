@@ -40,7 +40,7 @@ const Plans: React.FC = () => {
           <ul className="space-y-4 mb-8 flex-1">
             <li className="flex items-center gap-3 text-sm text-gray-300"><Check size={18} className="text-nutri-500" /> Tudo do Gratuito</li>
             <li className="flex items-center gap-3 text-sm text-gray-300"><Check size={18} className="text-nutri-500" /> Receitas Ilimitadas</li>
-            <li className="flex items-center gap-3 text-sm text-gray-300"><Check size={18} className="text-nutri-500" /> Assistente IA Avançado</li>
+            <li className="flex items-center gap-3 text-sm text-gray-300"><Check size={18} className="text-nutri-500" /> NutriAI Avançado</li>
             <li className="flex items-center gap-3 text-sm text-gray-300"><Check size={18} className="text-nutri-500" /> Sem Anúncios</li>
           </ul>
 

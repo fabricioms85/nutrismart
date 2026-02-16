@@ -11,7 +11,7 @@ export async function logSymptom(userId: string, symptom: string, severity: numb
         .select('*')
         .eq('user_id', userId)
         .eq('date', today)
-        .single();
+        .maybeSingle();
 
     const symptomEntry = `Symptom: ${symptom} (Severity: ${severity})${notes ? ` - ${notes}` : ''}`;
 
@@ -55,7 +55,7 @@ export async function getDailyLog(userId: string, date: string) {
         .select('*')
         .eq('user_id', userId)
         .eq('date', date)
-        .single();
+        .maybeSingle();
     return data;
 }
 

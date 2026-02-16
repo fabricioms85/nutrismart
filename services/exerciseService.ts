@@ -45,6 +45,23 @@ export async function getExercises(userId: string, date?: string): Promise<Exerc
     return data ? data.map(mapToExercise) : [];
 }
 
+/** Returns all exercises between dateFrom and dateTo (inclusive). Used for period totals (e.g. Progress). */
+export async function getExercisesInPeriod(userId: string, dateFrom: string, dateTo: string): Promise<Exercise[]> {
+    const { data, error } = await supabase
+        .from(TABLE_EXERCISES)
+        .select('*')
+        .eq('user_id', userId)
+        .gte('date', dateFrom)
+        .lte('date', dateTo)
+        .order('date', { ascending: true });
+
+    if (error) {
+        console.error('Error fetching exercises in period:', error);
+        return [];
+    }
+    return data ? data.map(mapToExercise) : [];
+}
+
 export async function addExercise(userId: string, exercise: Omit<Exercise, 'id'>): Promise<Exercise | null> {
     const dbRow = mapToDBExercise(exercise);
     const { data, error } = await supabase

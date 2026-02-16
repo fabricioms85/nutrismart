@@ -237,7 +237,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, userId, stats, updateWater,
           </div>
           <div className="text-left">
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Novo</p>
-            <p className="font-bold text-sm leading-none">Nutri Assistente</p>
+            <p className="font-bold text-sm leading-none">NutriAI</p>
           </div>
         </button>
       </div>
@@ -477,7 +477,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, userId, stats, updateWater,
               </div>
             </button>
 
-            <button onClick={() => onNavigate(NavItem.Planning)} className="w-full flex items-center gap-5 p-5 bg-white border border-white/60 shadow-lg shadow-gray-200/40 rounded-[2rem] hover:shadow-xl hover:shadow-purple-500/5 hover:-translate-y-0.5 transition-all group text-left relative overflow-hidden">
+            <button onClick={() => onNavigate(NavItem.MealPlanner)} className="w-full flex items-center gap-5 p-5 bg-white border border-white/60 shadow-lg shadow-gray-200/40 rounded-[2rem] hover:shadow-xl hover:shadow-purple-500/5 hover:-translate-y-0.5 transition-all group text-left relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-r from-purple-50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <div className="w-12 h-12 bg-purple-50 text-purple-500 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform relative z-10">
                 <Calendar size={24} />

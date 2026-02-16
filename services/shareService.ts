@@ -191,3 +191,307 @@ export function getPeriodLabel(days: number): string {
     if (days === 90) return 'Últimos 90 dias';
     return `Últimos ${days} dias`;
 }
+
+// --- Relatório de Progresso Completo (para compartilhamento clínico) ---
+
+export interface ProgressReportData {
+    userName: string;
+    period: number;
+    periodLabel: string;
+    dateRange: string;
+    generatedAt: string;
+    goals: {
+        calorieGoal: number;
+        waterGoal: number;
+        weightGoal?: number;
+        macros: { protein: number; carbs: number; fats: number };
+    };
+    summary: {
+        caloriesAvg: number;
+        caloriesPercent: number;
+        waterAvg: number;
+        waterPercent: number;
+        exerciseMinutes: number;
+        streak: number;
+        weightStart: number;
+        weightEnd: number;
+        weightChange: number;
+        mealsLogged: number;
+        isOnTrackCalories: boolean;
+    };
+    weightSeries: { day: string; weight: number }[];
+    calorieSeries: { day: string; calories: number }[];
+}
+
+const CHART_WIDTH = 760;
+const CHART_HEIGHT = 240;
+const NUTRI_GREEN = '#00b37e';
+const GOAL_AMBER = '#f59e0b';
+const TEXT_GRAY = '#374151';
+const BG_LIGHT = '#f9fafb';
+
+function renderWeightChartSVG(
+    weightSeries: { day: string; weight: number }[],
+    weightGoal: number | undefined,
+    width: number,
+    height: number
+): string {
+    if (weightSeries.length === 0) {
+        return `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg"><text x="${width / 2}" y="${height / 2}" text-anchor="middle" fill="${TEXT_GRAY}" font-size="14" font-family="Inter,system-ui,sans-serif">Sem dados no período</text></svg>`;
+    }
+    const padding = { top: 20, right: 20, bottom: 36, left: 44 };
+    const chartW = width - padding.left - padding.right;
+    const chartH = height - padding.top - padding.bottom;
+    const minW = Math.min(...weightSeries.map(d => d.weight));
+    const maxW = Math.max(...weightSeries.map(d => d.weight));
+    const range = maxW - minW || 2;
+    const yMin = minW - range * 0.1;
+    const yMax = maxW + range * 0.1;
+    const yScale = (v: number) => padding.top + chartH - ((v - yMin) / (yMax - yMin)) * chartH;
+    const xScale = (i: number) => padding.left + (i / Math.max(1, weightSeries.length - 1)) * chartW;
+
+    let pathD = '';
+    let areaD = '';
+    weightSeries.forEach((p, i) => {
+        const x = xScale(i);
+        const y = yScale(p.weight);
+        if (i === 0) {
+            pathD = `M ${x} ${y}`;
+            areaD = `M ${x} ${y}`;
+        } else {
+            pathD += ` L ${x} ${y}`;
+            areaD += ` L ${x} ${y}`;
+        }
+    });
+    const lastX = xScale(weightSeries.length - 1);
+    const firstX = xScale(0);
+    areaD += ` L ${lastX} ${padding.top + chartH} L ${firstX} ${padding.top + chartH} Z`;
+
+    const goalLine =
+        weightGoal != null && weightGoal >= yMin && weightGoal <= yMax
+            ? `<line x1="${padding.left}" y1="${yScale(weightGoal)}" x2="${width - padding.right}" y2="${yScale(weightGoal)}" stroke="${GOAL_AMBER}" stroke-width="2" stroke-dasharray="6 4"/><text x="${width - padding.right - 4}" y="${yScale(weightGoal) - 6}" text-anchor="end" fill="${GOAL_AMBER}" font-size="11" font-family="Inter,system-ui,sans-serif">Meta ${weightGoal}kg</text>`
+            : '';
+
+    const yTicks = [yMin, (yMin + yMax) / 2, yMax].map(v => Math.round(v * 10) / 10);
+    const gridLines = yTicks
+        .map(
+            (v, i) =>
+                `<line x1="${padding.left}" y1="${yScale(v)}" x2="${width - padding.right}" y2="${yScale(v)}" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="4 4"/>`
+        )
+        .join('');
+    const yLabels = yTicks
+        .map(
+            v =>
+                `<text x="${padding.left - 6}" y="${yScale(v) + 4}" text-anchor="end" fill="#6b7280" font-size="11" font-family="Inter,system-ui,sans-serif">${v}kg</text>`
+        )
+        .join('');
+
+    const xStep = Math.max(1, Math.floor(weightSeries.length / 8));
+    const xLabels = weightSeries
+        .map((p, i) => (i % xStep === 0 || i === weightSeries.length - 1 ? `<text x="${xScale(i)}" y="${height - 8}" text-anchor="middle" fill="#6b7280" font-size="10" font-family="Inter,system-ui,sans-serif">${escapeHtml(p.day)}</text>` : ''))
+        .join('');
+
+    const points = weightSeries
+        .map((p, i) => `<circle cx="${xScale(i)}" cy="${yScale(p.weight)}" r="4" fill="${NUTRI_GREEN}" stroke="#fff" stroke-width="2"/>`)
+        .join('');
+
+    return `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+  ${gridLines}
+  ${yLabels}
+  ${xLabels}
+  <path d="${areaD}" fill="${NUTRI_GREEN}" fill-opacity="0.2"/>
+  <path d="${pathD}" fill="none" stroke="${NUTRI_GREEN}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  ${points}
+  ${goalLine}
+</svg>`;
+}
+
+function renderCalorieChartSVG(
+    calorieSeries: { day: string; calories: number }[],
+    calorieGoal: number,
+    width: number,
+    height: number
+): string {
+    if (calorieSeries.length === 0) {
+        return `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg"><text x="${width / 2}" y="${height / 2}" text-anchor="middle" fill="${TEXT_GRAY}" font-size="14" font-family="Inter,system-ui,sans-serif">Sem dados no período</text></svg>`;
+    }
+    const padding = { top: 20, right: 20, bottom: 36, left: 48 };
+    const chartW = width - padding.left - padding.right;
+    const chartH = height - padding.top - padding.bottom;
+    const maxCal = Math.max(...calorieSeries.map(d => d.calories), calorieGoal, 1);
+    const yMax = Math.ceil(maxCal / 500) * 500 || 2000;
+    const yScale = (v: number) => padding.top + chartH - (v / yMax) * chartH;
+    const barW = Math.max(4, (chartW / calorieSeries.length) * 0.7);
+    const gap = chartW / calorieSeries.length;
+    const xCenter = (i: number) => padding.left + (i + 0.5) * gap;
+
+    const goalY = yScale(calorieGoal);
+    const goalLine =
+        calorieGoal > 0 && calorieGoal <= yMax
+            ? `<line x1="${padding.left}" y1="${goalY}" x2="${width - padding.right}" y2="${goalY}" stroke="${GOAL_AMBER}" stroke-width="2" stroke-dasharray="6 4"/><text x="${width - padding.right - 4}" y="${goalY - 6}" text-anchor="end" fill="${GOAL_AMBER}" font-size="11" font-family="Inter,system-ui,sans-serif">Meta ${calorieGoal}</text>`
+            : '';
+
+    const bars = calorieSeries
+        .map((p, i) => {
+            const x = xCenter(i) - barW / 2;
+            const h = Math.max(0, (p.calories / yMax) * chartH);
+            const y = padding.top + chartH - h;
+            return `<rect x="${x}" y="${y}" width="${barW}" height="${h}" rx="4" fill="${NUTRI_GREEN}"/>`;
+        })
+        .join('');
+
+    const yTicks = [0, Math.round(yMax / 2), yMax];
+    const gridLines = yTicks
+        .map(
+            v =>
+                `<line x1="${padding.left}" y1="${yScale(v)}" x2="${width - padding.right}" y2="${yScale(v)}" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="4 4"/>`
+        )
+        .join('');
+    const yLabels = yTicks
+        .map(
+            v =>
+                `<text x="${padding.left - 6}" y="${yScale(v) + 4}" text-anchor="end" fill="#6b7280" font-size="11" font-family="Inter,system-ui,sans-serif">${v}</text>`
+        )
+        .join('');
+
+    const xStep = Math.max(1, Math.floor(calorieSeries.length / 8));
+    const xLabels = calorieSeries
+        .map((p, i) => (i % xStep === 0 || i === calorieSeries.length - 1 ? `<text x="${xCenter(i)}" y="${height - 8}" text-anchor="middle" fill="#6b7280" font-size="10" font-family="Inter,system-ui,sans-serif">${escapeHtml(p.day)}</text>` : ''))
+        .join('');
+
+    return `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+  ${gridLines}
+  ${yLabels}
+  ${xLabels}
+  ${bars}
+  ${goalLine}
+</svg>`;
+}
+
+function createProgressReportElement(data: ProgressReportData): HTMLDivElement {
+    const container = document.createElement('div');
+    container.style.cssText = `
+    width: 800px;
+    min-height: 400px;
+    padding: 32px 24px;
+    background: #fff;
+    font-family: 'Inter', system-ui, sans-serif;
+    color: ${TEXT_GRAY};
+    box-sizing: border-box;
+    overflow: visible;
+  `;
+
+    const s = data.summary;
+    const g = data.goals;
+    const weightSvg = renderWeightChartSVG(data.weightSeries, g.weightGoal, CHART_WIDTH, CHART_HEIGHT);
+    const calorieSvg = renderCalorieChartSVG(data.calorieSeries, g.calorieGoal, CHART_WIDTH, CHART_HEIGHT);
+
+    const goalsRow = `
+    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 24px;">
+      <div style="background: ${BG_LIGHT}; border-radius: 12px; padding: 14px;"><span style="font-size: 11px; color: #6b7280;">Meta calórica</span><div style="font-size: 18px; font-weight: 700; color: ${TEXT_GRAY};">${g.calorieGoal.toLocaleString()} kcal/dia</div></div>
+      <div style="background: ${BG_LIGHT}; border-radius: 12px; padding: 14px;"><span style="font-size: 11px; color: #6b7280;">Meta hídrica</span><div style="font-size: 18px; font-weight: 700; color: ${TEXT_GRAY};">${(g.waterGoal / 1000).toFixed(1)} L/dia</div></div>
+      ${g.weightGoal != null ? `<div style="background: ${BG_LIGHT}; border-radius: 12px; padding: 14px;"><span style="font-size: 11px; color: #6b7280;">Meta de peso</span><div style="font-size: 18px; font-weight: 700; color: ${TEXT_GRAY};">${g.weightGoal} kg</div></div>` : ''}
+      <div style="background: ${BG_LIGHT}; border-radius: 12px; padding: 14px;"><span style="font-size: 11px; color: #6b7280;">Macros (P/C/G)</span><div style="font-size: 16px; font-weight: 600; color: ${TEXT_GRAY};">${g.macros.protein}g / ${g.macros.carbs}g / ${g.macros.fats}g</div></div>
+    </div>`;
+
+    const summaryRow = `
+    <div style="display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 24px;">
+      <div style="flex: 1; min-width: 120px; background: ${BG_LIGHT}; border-radius: 12px; padding: 14px;">
+        <span style="font-size: 11px; color: #6b7280;">Média calórica</span>
+        <div style="font-size: 18px; font-weight: 700; color: ${TEXT_GRAY};">${s.caloriesAvg.toLocaleString()} kcal <span style="font-size: 12px; font-weight: 500; color: #6b7280;">(${s.caloriesPercent}% da meta)</span></div>
+      </div>
+      <div style="flex: 1; min-width: 120px; background: ${BG_LIGHT}; border-radius: 12px; padding: 14px;">
+        <span style="font-size: 11px; color: #6b7280;">Hidratação</span>
+        <div style="font-size: 18px; font-weight: 700; color: ${TEXT_GRAY};">${(s.waterAvg / 1000).toFixed(1)} L <span style="font-size: 12px; font-weight: 500; color: #6b7280;">(${s.waterPercent}% da meta)</span></div>
+      </div>
+      <div style="flex: 1; min-width: 100px; background: ${BG_LIGHT}; border-radius: 12px; padding: 14px;">
+        <span style="font-size: 11px; color: #6b7280;">Exercício</span>
+        <div style="font-size: 18px; font-weight: 700; color: ${TEXT_GRAY};">${s.exerciseMinutes} min</div>
+      </div>
+      <div style="flex: 1; min-width: 100px; background: ${BG_LIGHT}; border-radius: 12px; padding: 14px;">
+        <span style="font-size: 11px; color: #6b7280;">Sequência</span>
+        <div style="font-size: 18px; font-weight: 700; color: ${TEXT_GRAY};">${s.streak} dias</div>
+      </div>
+      <div style="flex: 1; min-width: 120px; background: ${BG_LIGHT}; border-radius: 12px; padding: 14px;">
+        <span style="font-size: 11px; color: #6b7280;">Variação peso</span>
+        <div style="font-size: 18px; font-weight: 700; color: ${TEXT_GRAY};">${s.weightChange > 0 ? '+' : ''}${s.weightChange.toFixed(1)} kg <span style="font-size: 11px; color: #6b7280;">(${s.weightStart.toFixed(1)} → ${s.weightEnd.toFixed(1)} kg)</span></div>
+      </div>
+      <div style="flex: 1; min-width: 100px; background: ${BG_LIGHT}; border-radius: 12px; padding: 14px;">
+        <span style="font-size: 11px; color: #6b7280;">Refeições</span>
+        <div style="font-size: 18px; font-weight: 700; color: ${TEXT_GRAY};">${s.mealsLogged}</div>
+      </div>
+      <div style="flex: 1; min-width: 100px; background: ${s.isOnTrackCalories ? '#dcfce7' : '#fef3c7'}; border-radius: 12px; padding: 14px;">
+        <span style="font-size: 11px; color: #6b7280;">Calorias</span>
+        <div style="font-size: 16px; font-weight: 600; color: ${s.isOnTrackCalories ? '#166534' : '#b45309'};">${s.isOnTrackCalories ? 'Na meta' : 'Acima da meta'}</div>
+      </div>
+    </div>`;
+
+    container.innerHTML = `
+    <div style="text-align: center; margin-bottom: 24px; padding-bottom: 20px; border-bottom: 2px solid ${NUTRI_GREEN};">
+      <div style="font-size: 14px; color: #6b7280; letter-spacing: 1px;">RELATÓRIO DE PROGRESSO NUTRICIONAL</div>
+      <div style="font-size: 22px; font-weight: 700; color: ${TEXT_GRAY}; margin-top: 8px;">${escapeHtml(data.userName)}</div>
+      <div style="font-size: 13px; color: #6b7280; margin-top: 6px;">${escapeHtml(data.periodLabel)} · ${escapeHtml(data.dateRange)}</div>
+      <div style="font-size: 11px; color: #9ca3af; margin-top: 4px;">Gerado em ${escapeHtml(data.generatedAt)}</div>
+    </div>
+    <div style="margin-bottom: 16px;">
+      <h3 style="font-size: 14px; font-weight: 600; color: ${TEXT_GRAY}; margin: 0 0 12px 0;">Metas</h3>
+      ${goalsRow}
+    </div>
+    <div style="margin-bottom: 16px;">
+      <h3 style="font-size: 14px; font-weight: 600; color: ${TEXT_GRAY}; margin: 0 0 12px 0;">Resumo do período</h3>
+      ${summaryRow}
+    </div>
+    <div style="margin-bottom: 16px;">
+      <h3 style="font-size: 14px; font-weight: 600; color: ${TEXT_GRAY}; margin: 0 0 12px 0;">Evolução do peso</h3>
+      <div style="background: ${BG_LIGHT}; border-radius: 12px; padding: 16px;">${weightSvg}</div>
+    </div>
+    <div style="margin-bottom: 16px;">
+      <h3 style="font-size: 14px; font-weight: 600; color: ${TEXT_GRAY}; margin: 0 0 12px 0;">Consumo calórico diário</h3>
+      <div style="background: ${BG_LIGHT}; border-radius: 12px; padding: 16px;">${calorieSvg}</div>
+    </div>
+    <div style="text-align: center; padding-top: 16px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #9ca3af;">Gerado pelo <strong>NutriSmart</strong> · ${escapeHtml(data.generatedAt)}</div>
+  `;
+
+    return container;
+}
+
+async function reportElementToCanvas(element: HTMLElement): Promise<HTMLCanvasElement> {
+    element.style.position = 'fixed';
+    element.style.left = '-9000px';
+    element.style.top = '0';
+    element.style.opacity = '1';
+    element.style.visibility = 'visible';
+    element.style.pointerEvents = 'none';
+    element.style.zIndex = '99999';
+    document.body.appendChild(element);
+
+    await new Promise((r) => requestAnimationFrame(r));
+    await new Promise((r) => requestAnimationFrame(r));
+    await new Promise((r) => setTimeout(r, 200));
+
+    try {
+        const canvas = await html2canvas(element, {
+            scale: 2,
+            useCORS: true,
+            logging: false,
+            backgroundColor: '#ffffff',
+            allowTaint: true,
+            imageTimeout: 0,
+        });
+        return canvas;
+    } finally {
+        document.body.removeChild(element);
+    }
+}
+
+export async function generateProgressReportImage(data: ProgressReportData): Promise<Blob> {
+    const element = createProgressReportElement(data);
+    const canvas = await reportElementToCanvas(element);
+
+    return new Promise((resolve, reject) => {
+        canvas.toBlob((blob) => {
+            if (blob) resolve(blob);
+            else reject(new Error('Falha ao gerar imagem do relatório'));
+        }, 'image/png');
+    });
+}

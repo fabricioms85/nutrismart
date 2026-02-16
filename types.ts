@@ -117,8 +117,14 @@ export interface Recipe {
   calories: number;
   timeMinutes: number;
   image: string;
+  /** Termo em inglês para buscar imagem correspondente no Unsplash (opção 2A). */
+  imageSearchTerm?: string;
   tags: string[];
   difficulty: 'Fácil' | 'Médio' | 'Difícil';
+  /** Ingredientes (opcional); usado na tela de detalhe da receita. */
+  ingredients?: string[];
+  /** Passos do modo de preparo (opcional). */
+  instructions?: string[];
 }
 
 export interface Achievement {
@@ -190,9 +196,8 @@ export enum NavItem {
   RegisterExercise = 'Registrar Exercício',
   Recipes = 'Receitas',
   MealPlanner = 'Planejador Semanal',
-  Planning = 'Planejamento',
   Progress = 'Progresso',
-  Assistant = 'Assistente IA',
+  Assistant = 'NutriAI',
   Awards = 'Conquistas',
   Notifications = 'Notificações',
   ShoppingList = 'Lista de Compras',

@@ -4,7 +4,6 @@ import {
   Utensils,
   Dumbbell,
   ChefHat,
-  CalendarDays,
   CalendarCheck,
   TrendingUp,
   Sparkles,
@@ -37,12 +36,11 @@ const Sidebar: React.FC<SidebarProps> = ({ activeItem, onNavigate, isOpen, setIs
     { id: NavItem.RegisterExercise, icon: Dumbbell, label: 'Exercícios' },
     { id: NavItem.Recipes, icon: ChefHat, label: 'Receitas' },
     { id: NavItem.MealPlanner, icon: CalendarCheck, label: 'Planejador Semanal' },
-    { id: NavItem.Planning, icon: CalendarDays, label: 'Planejamento' },
     { id: NavItem.Progress, icon: TrendingUp, label: 'Progresso' },
   ];
 
   const secondaryItems = [
-    { id: NavItem.Assistant, icon: Sparkles, label: 'Assistente IA' },
+    { id: NavItem.Assistant, icon: Sparkles, label: 'NutriAI' },
     { id: NavItem.Awards, icon: Trophy, label: 'Conquistas' },
     { id: NavItem.Notifications, icon: Bell, label: 'Notificações' },
     { id: NavItem.Plans, icon: CreditCard, label: 'Planos' },

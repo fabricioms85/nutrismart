@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Send, Loader2, HelpCircle, CheckCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 import { supabase } from '../services/supabaseClient';
 
 interface SupportFormProps {
@@ -19,6 +20,7 @@ const SUBJECTS = [
 
 const SupportForm: React.FC<SupportFormProps> = ({ isOpen, onClose }) => {
     const { authUser, profile } = useAuth();
+    const toast = useToast();
     const [subject, setSubject] = useState('');
     const [message, setMessage] = useState('');
     const [email, setEmail] = useState(authUser?.email || '');
@@ -31,26 +33,24 @@ const SupportForm: React.FC<SupportFormProps> = ({ isOpen, onClose }) => {
 
         setLoading(true);
         try {
-            // Tenta salvar na tabela support_tickets (se existir)
-            // Se não existir, o erro é capturado e o ticket é logado no console
             const { error } = await supabase.from('support_tickets').insert({
                 user_id: authUser?.id || null,
-                email: email || authUser?.email || 'não informado',
+                email: (email || authUser?.email || '').trim() || 'não informado',
                 subject,
                 message: message.trim(),
                 user_name: profile?.name || 'Anônimo',
             });
 
             if (error) {
-                // Tabela pode não existir ainda — loga para o time
                 console.warn('[Suporte] Erro ao salvar ticket:', error.message);
-                console.log('[Suporte] Ticket:', { email, subject, message });
+                toast.error('Não foi possível enviar. Tente novamente ou contate-nos por e-mail.');
+                return;
             }
 
             setSent(true);
         } catch (err) {
             console.error('[Suporte] Erro:', err);
-            setSent(true); // Mostra confirmação mesmo assim
+            toast.error('Erro ao enviar mensagem. Tente novamente.');
         } finally {
             setLoading(false);
         }

@@ -6,10 +6,11 @@ import { useToast } from '../contexts/ToastContext';
 import { getWeightHistory, addWeightEntry } from '../services/weightService';
 import { updateProfile } from '../services/profileService';
 import { calculateStreak } from '../services/gamificationService';
-import { getWeeklyStats } from '../services/statsService';
+import { getStatsForPeriod } from '../services/statsService';
 import { getMeals } from '../services/mealService';
+import { getExercisesInPeriod } from '../services/exerciseService';
 
-import { generateWeeklySummaryImage, shareImage, getWeekRange, getPeriodLabel, isShareSupported } from '../services/shareService';
+import { generateProgressReportImage, shareImage, getWeekRange, getPeriodLabel, isShareSupported } from '../services/shareService';
 import WeightModal from '../components/WeightModal';
 import { WeightGoal } from '../types';
 
@@ -56,9 +57,9 @@ const Progress: React.FC = () => {
       }));
       setWeightHistory(formattedWeight);
 
-      // Fetch calorie history
-      const weeklyData = await getWeeklyStats(authUser.id);
-      const formattedCalories = weeklyData.map(entry => ({
+      // Fetch calorie (and water) history for the selected period
+      const periodStats = await getStatsForPeriod(authUser.id, period);
+      const formattedCalories = periodStats.map(entry => ({
         day: formatDate(entry.date),
         calories: entry.stats.caloriesConsumed,
         goal: profile?.dailyCalorieGoal || 2000,
@@ -73,9 +74,20 @@ const Progress: React.FC = () => {
       const meals = await getMeals(authUser.id);
       setTotalMeals(meals.length);
 
-      // Calculate total water and exercise from weekly stats
-      const waterTotal = weeklyData.reduce((sum, d) => sum + d.stats.waterConsumed, 0);
-      setTotalWater(Math.round(waterTotal / 7));
+      // Average water per day over the period
+      const waterTotal = periodStats.reduce((sum, d) => sum + d.stats.waterConsumed, 0);
+      setTotalWater(period > 0 ? Math.round(waterTotal / period) : 0);
+
+      // Total exercise minutes in the period (for report and summary)
+      const today = new Date();
+      const periodStart = new Date(today);
+      periodStart.setDate(today.getDate() - (period - 1));
+      const toLocalDateStr = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const dateFrom = toLocalDateStr(periodStart);
+      const dateTo = toLocalDateStr(today);
+      const periodExercises = await getExercisesInPeriod(authUser.id, dateFrom, dateTo);
+      const exerciseMins = periodExercises.reduce((sum, e) => sum + (e.durationMinutes || 0), 0);
+      setTotalExerciseMinutes(exerciseMins);
     } catch (error) {
       console.error('Error fetching progress data:', error);
     } finally {
@@ -204,31 +216,47 @@ const Progress: React.FC = () => {
     setIsSharing(true);
 
     try {
-      const summaryData = {
+      const waterGoal = profile.dailyWaterGoal ?? 2500;
+      const reportData = {
         userName: profile.name || 'Usuário NutriSmart',
-        weekRange: getWeekRange(period),
+        period,
         periodLabel: getPeriodLabel(period),
-        caloriesAvg: avgCalories,
-        caloriesGoal: calorieGoal,
-        waterAvg: totalWater,
-        waterGoal: profile.dailyWaterGoal ?? 2500,
-        exerciseMinutes: totalExerciseMinutes,
-        weightChange: weightChange,
-        streak: streak,
-        mealsLogged: totalMeals,
+        dateRange: getWeekRange(period),
+        generatedAt: new Date().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }),
+        goals: {
+          calorieGoal,
+          waterGoal,
+          weightGoal: profile.weightGoal?.status === 'active' ? profile.weightGoal.targetWeight : undefined,
+          macros: profile.macros ?? { protein: 100, carbs: 250, fats: 70 },
+        },
+        summary: {
+          caloriesAvg: avgCalories,
+          caloriesPercent: calorieGoal > 0 ? Math.min(100, Math.round((avgCalories / calorieGoal) * 100)) : 0,
+          waterAvg: totalWater,
+          waterPercent: waterGoal > 0 ? Math.min(100, Math.round((totalWater / waterGoal) * 100)) : 0,
+          exerciseMinutes: totalExerciseMinutes,
+          streak,
+          weightStart: startWeight,
+          weightEnd: currentWeight,
+          weightChange,
+          mealsLogged: totalMeals,
+          isOnTrackCalories: isOnTrack,
+        },
+        weightSeries: weightHistory,
+        calorieSeries: calorieHistory.map(({ day, calories }) => ({ day, calories })),
       };
 
-      const blob = await generateWeeklySummaryImage(summaryData);
+      const blob = await generateProgressReportImage(reportData);
       const shared = await shareImage(blob);
 
       if (shared) {
-        showSuccess('Resumo compartilhado!');
+        showSuccess('Relatório compartilhado!');
       } else {
-        showSuccess('Imagem gerada! Se o download não iniciou, verifique a pasta de downloads ou permita pop-ups para este site.');
+        showSuccess('Relatório gerado! Se o download não iniciou, verifique a pasta de downloads ou permita pop-ups para este site.');
       }
     } catch (error) {
       console.error('Error sharing:', error);
-      showError('Não foi possível gerar a imagem. Tente novamente.');
+      showError('Não foi possível gerar o relatório. Tente novamente.');
     } finally {
       setIsSharing(false);
     }
@@ -469,8 +497,8 @@ const Progress: React.FC = () => {
           </div>
 
           {weightHistory.length > 1 ? (
-            <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="h-72 min-h-[224px]">
+              <ResponsiveContainer width="100%" height="100%" minWidth={224} minHeight={224}>
                 <AreaChart data={weightHistory}>
                   <defs>
                     <linearGradient id="weightGradient" x1="0" y1="0" x2="0" y2="1">
@@ -551,12 +579,12 @@ const Progress: React.FC = () => {
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
             <h3 className="font-bold text-gray-900">Consumo Calórico</h3>
-            <span className="text-sm text-gray-500">Últimos 7 dias</span>
+            <span className="text-sm text-gray-500">{periodLabels[period]}</span>
           </div>
 
           {calorieHistory.length > 0 ? (
-            <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="h-72 min-h-[224px]">
+              <ResponsiveContainer width="100%" height="100%" minWidth={224} minHeight={224}>
                 <BarChart data={calorieHistory}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                   <XAxis

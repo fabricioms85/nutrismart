@@ -6,6 +6,7 @@ import {
 import { Exercise, User } from '../types';
 import { getLocalDateString } from '../utils/dateUtils';
 import { getExercisesPaginated, deleteExercise as dbDeleteExercise } from '../services/exerciseService';
+import { useAuth } from '../contexts/AuthContext';
 
 interface RegisterExerciseProps {
   user: User;
@@ -42,6 +43,7 @@ type HistoryPeriod = 'today' | 'week' | 'month' | 'all';
 const HISTORY_PAGE_SIZE = 20;
 
 const RegisterExercise: React.FC<RegisterExerciseProps> = ({ user, onSave, onUpdate, onDelete }) => {
+  const { authUser } = useAuth();
   const [exerciseData, setExerciseData] = useState({
     name: '',
     duration: '',
@@ -117,14 +119,14 @@ const RegisterExercise: React.FC<RegisterExerciseProps> = ({ user, onSave, onUpd
     }
   }, [exerciseData.name, exerciseData.duration, exerciseData.intensity, user.weight, editingId, autoCalculated]);
 
-  // Load History
+  // Load History (usa authUser.id para garantir o mesmo usuário da sessão/RLS)
   const loadHistory = useCallback(async (period: HistoryPeriod, offset: number = 0, append: boolean = false) => {
-    if (!user) return;
+    if (!authUser?.id) return;
 
     setHistoryLoading(true);
     try {
       const range = getDateRange(period);
-      const result = await getExercisesPaginated(user.id, {
+      const result = await getExercisesPaginated(authUser.id, {
         ...range,
         limit: HISTORY_PAGE_SIZE,
         offset
@@ -138,7 +140,7 @@ const RegisterExercise: React.FC<RegisterExerciseProps> = ({ user, onSave, onUpd
     } finally {
       setHistoryLoading(false);
     }
-  }, [user]);
+  }, [authUser?.id]);
 
   // Initial Load & Period Change
   useEffect(() => {

@@ -7,7 +7,6 @@ import RegisterMeal from './pages/RegisterMeal';
 import RegisterExercise from './pages/RegisterExercise';
 import Recipes from './pages/Recipes';
 import MealPlanner from './pages/MealPlanner';
-import Planning from './pages/Planning';
 import Progress from './pages/Progress';
 import Awards from './pages/Awards';
 import Notifications from './pages/Notifications';
@@ -115,21 +114,20 @@ const AppContent: React.FC = () => {
   // Derive display user from profile or default
   const user = profile || DEFAULT_USER;
 
-  // Initialize notifications on mount
+  // Initialize notifications when clinical mode settings change
+  const profileId = profile?.id;
+  const isClinicalMode = profile?.isClinicalMode;
+  const clinicalSettings = profile?.clinicalSettings;
   useEffect(() => {
-    console.log("AppContent mounted, initializing...");
-    if (profile) {
-      try {
-        initializeNotifications(
-          (profile.isClinicalMode && profile.clinicalSettings)
-            ? profile.clinicalSettings
-            : undefined
-        );
-      } catch (error) {
-        console.error("Failed to initialize notifications:", error);
-      }
+    if (!profileId) return;
+    try {
+      initializeNotifications(
+        (isClinicalMode && clinicalSettings) ? clinicalSettings : undefined
+      );
+    } catch (error) {
+      console.error("Failed to initialize notifications:", error);
     }
-  }, [profile]);
+  }, [profileId, isClinicalMode, clinicalSettings]);
 
   // Handlers
   const handleUpdateWater = async (amount: number) => {
@@ -281,8 +279,6 @@ const AppContent: React.FC = () => {
         return <Recipes />;
       case NavItem.MealPlanner:
         return <MealPlanner user={user} />;
-      case NavItem.Planning:
-        return <Planning user={user} />;
       case NavItem.Progress:
         return <Progress weightHistory={[{ day: 'Hoje', weight: user.weight || 0 }]} />;
       case NavItem.Assistant:
@@ -325,7 +321,7 @@ const AppContent: React.FC = () => {
   return (
     <AppLayout currentPath={activeItem} onNavigate={setActiveItem}>
       {renderContent()}
-      <AIChat user={user} stats={stats} meals={meals} />
+      <AIChat user={user} stats={stats} meals={meals} currentPath={activeItem} />
       <LevelUpModal
         isOpen={showLevelUp}
         newLevel={newLevel}

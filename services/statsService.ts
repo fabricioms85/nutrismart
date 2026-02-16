@@ -11,42 +11,50 @@ export interface WeeklyStatEntry {
     stats: DailyStats;
 }
 
-export async function getWeeklyStats(userId: string): Promise<WeeklyStatEntry[]> {
-    const today = new Date();
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(today.getDate() - 6);
-    sevenDaysAgo.setHours(0, 0, 0, 0);
-    const dateLimit = sevenDaysAgo.toISOString();
+/** Get local date string YYYY-MM-DD for a date (avoids UTC shift). */
+function toLocalDateStr(d: Date): string {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
 
-    // Fetch Meals
+/**
+ * Returns stats (meals, water) for the last N days. Same shape as getWeeklyStats.
+ * Use this when the UI period is 7, 14, 30 or 90 days.
+ */
+export async function getStatsForPeriod(userId: string, days: number): Promise<WeeklyStatEntry[]> {
+    const today = new Date();
+    const start = new Date(today);
+    start.setDate(today.getDate() - (days - 1));
+    start.setHours(0, 0, 0, 0);
+    const dateFrom = toLocalDateStr(start);
+
     const { data: meals, error: mealsError } = await supabase
         .from(TABLE_MEALS)
         .select('*')
         .eq('user_id', userId)
-        .gte('date', dateLimit);
+        .gte('date', dateFrom);
 
     if (mealsError) {
         console.error('Error fetching meals for stats:', mealsError);
     }
 
-    // Fetch Daily Logs (Water)
     const { data: logs, error: logsError } = await supabase
         .from(TABLE_DAILY_LOGS)
         .select('*')
         .eq('user_id', userId)
-        .gte('date', dateLimit);
+        .gte('date', dateFrom);
 
     if (logsError) {
         console.error('Error fetching daily logs for stats:', logsError);
     }
 
     const statsMap: Record<string, DailyStats> = {};
-
-    // Initialize last 7 days
-    for (let i = 0; i < 7; i++) {
-        const d = new Date();
+    for (let i = 0; i < days; i++) {
+        const d = new Date(today);
         d.setDate(today.getDate() - i);
-        const dateStr = d.toISOString().split('T')[0];
+        const dateStr = toLocalDateStr(d);
         statsMap[dateStr] = {
             caloriesConsumed: 0,
             caloriesBurned: 0,
@@ -57,9 +65,8 @@ export async function getWeeklyStats(userId: string): Promise<WeeklyStatEntry[]>
         };
     }
 
-    // Aggregate Meals (DB retorna macro_protein/macro_carbs/macro_fats; Meal type usa macros.protein etc.)
     meals?.forEach((meal: any) => {
-        const dateStr = new Date(meal.date).toISOString().split('T')[0];
+        const dateStr = typeof meal.date === 'string' ? meal.date.split('T')[0] : new Date(meal.date).toISOString().split('T')[0];
         if (statsMap[dateStr]) {
             statsMap[dateStr].caloriesConsumed += meal.calories || 0;
             statsMap[dateStr].proteinConsumed += meal.macro_protein ?? meal.macros?.protein ?? meal.protein ?? 0;
@@ -68,16 +75,18 @@ export async function getWeeklyStats(userId: string): Promise<WeeklyStatEntry[]>
         }
     });
 
-    // Aggregate Daily Logs (Water)
     logs?.forEach((log: any) => {
-        const dateStr = new Date(log.date).toISOString().split('T')[0];
+        const dateStr = typeof log.date === 'string' ? log.date.split('T')[0] : new Date(log.date).toISOString().split('T')[0];
         if (statsMap[dateStr]) {
             statsMap[dateStr].waterConsumed += log.water_consumed || 0;
         }
     });
 
-    // Sort by date ascending
     return Object.entries(statsMap)
         .map(([date, stats]) => ({ date, stats }))
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+}
+
+export async function getWeeklyStats(userId: string): Promise<WeeklyStatEntry[]> {
+    return getStatsForPeriod(userId, 7);
 }
