@@ -57,9 +57,7 @@ const AppLayout: React.FC<{ children: React.ReactNode; currentPath: NavItem; onN
       <div className="flex-1 lg:ml-72 flex flex-col min-h-screen transition-all duration-500 ease-in-out overflow-x-hidden min-w-0">
         <div className="lg:hidden p-4 bg-white/80 backdrop-blur-md border-b border-gray-100 flex items-center justify-between sticky top-0 z-10 shadow-sm">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-nutri-500 to-nutri-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-nutri-500/20">
-              <span className="font-heading font-bold text-xs">NS</span>
-            </div>
+            <img src="/logo.png?v=2" alt="NutriSmart" className="w-10 h-10 rounded-xl object-contain object-center bg-transparent flex-shrink-0" />
             <span className="font-heading font-bold text-gray-900 tracking-tight">NutriSmart</span>
           </div>
           <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-gray-500 hover:bg-gray-100 rounded-xl transition-colors">
