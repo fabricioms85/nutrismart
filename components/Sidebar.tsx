@@ -72,9 +72,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeItem, onNavigate, isOpen, setIs
         {/* Logo Area - Absolute Top */}
         <div className="p-8 pb-4 relative z-10">
           <div className="flex items-center gap-3 mb-8 group cursor-pointer">
-            <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-white bg-gradient-to-br from-nutri-500 to-nutri-600 shadow-lg shadow-nutri-500/30 transform group-hover:rotate-6 transition-transform duration-500">
-              <span className="font-heading font-bold text-xl">N</span>
-            </div>
+            <img src="/logo.png?v=2" alt="NutriSmart" className="w-12 h-12 rounded-2xl object-contain object-center bg-transparent transform group-hover:rotate-6 transition-transform duration-500" />
             <div>
               <h1 className="font-heading font-extrabold text-2xl text-gray-900 leading-none tracking-tight">NutriSmart</h1>
               <p className="text-[10px] font-bold text-nutri-500 tracking-widest uppercase mt-1 bg-nutri-50 inline-block px-2 py-0.5 rounded-full">Premium</p>

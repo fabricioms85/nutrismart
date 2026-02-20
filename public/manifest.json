@@ -10,13 +10,13 @@
     "start_url": "/",
     "icons": [
         {
-            "src": "/icon-192.png",
+            "src": "/logo.png",
             "sizes": "192x192",
             "type": "image/png",
             "purpose": "maskable any"
         },
         {
-            "src": "/icon-512.png",
+            "src": "/logo.png",
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "maskable any"
@@ -35,7 +35,7 @@
             "url": "/register-meal",
             "icons": [
                 {
-                    "src": "/icon-192.png",
+                    "src": "/logo.png",
                     "sizes": "192x192"
                 }
             ]
@@ -47,7 +47,7 @@
             "url": "/progress",
             "icons": [
                 {
-                    "src": "/icon-192.png",
+                    "src": "/logo.png",
                     "sizes": "192x192"
                 }
             ]

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, Lock, User, Eye, EyeOff, Loader2, ArrowRight, Sparkles } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, Loader2, ArrowRight } from 'lucide-react';
 import LegalModal from '../components/legal/LegalModal';
 import TermsOfUseContent from '../components/legal/TermsOfUseContent';
 import PrivacyPolicyContent from '../components/legal/PrivacyPolicyContent';
@@ -61,9 +61,7 @@ export default function AuthPage({ onSignIn, onSignUp }: AuthPageProps) {
             <div className="w-full max-w-md relative z-10 text-center">
                 {/* Logo */}
                 <div className="mb-8 transform hover:scale-105 transition-transform duration-500">
-                    <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-nutri-500 to-nutri-600 rounded-[2rem] shadow-xl shadow-nutri-500/30 mb-6 rotate-3">
-                        <Sparkles className="w-10 h-10 text-white" />
-                    </div>
+                    <img src="/logo.png?v=2" alt="NutriSmart" className="w-20 h-20 mx-auto mb-6 object-contain object-center bg-transparent" />
                     <h1 className="font-heading font-extrabold text-4xl text-gray-900 mb-2 tracking-tight">NutriSmart</h1>
                     <p className="text-gray-500 font-medium tracking-wide">Sua jornada saudável começa aqui</p>
                 </div>

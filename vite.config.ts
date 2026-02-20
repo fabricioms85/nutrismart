@@ -56,7 +56,7 @@ export default defineConfig(({ mode }) => {
       },
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['favicon.ico', 'icon-*.png', 'apple-touch-icon.png'],
+        includeAssets: ['logo.png', 'favicon.ico', 'icon-*.png', 'apple-touch-icon.png'],
         manifest: {
           name: 'NutriSmart',
           short_name: 'NutriSmart',
@@ -69,13 +69,13 @@ export default defineConfig(({ mode }) => {
           start_url: '/',
           icons: [
             {
-              src: '/icon-192.png',
+              src: '/logo.png',
               sizes: '192x192',
               type: 'image/png',
-              purpose: 'maskable any',
+              purpose: 'any',
             },
             {
-              src: '/icon-512.png',
+              src: '/logo.png',
               sizes: '512x512',
               type: 'image/png',
               purpose: 'maskable any',
