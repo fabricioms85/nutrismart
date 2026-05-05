@@ -1,6 +1,6 @@
-
 import { supabase } from './supabaseClient';
-import { Achievement, Challenge } from '../types';
+import { Achievement, Challenge, DailyStats } from '../types';
+import { getWeeklyStats as getWeeklyStatsFromLogs } from './statsService';
 
 // Constants for tables
 export const TABLE_USER_PROGRESS = 'user_progress';
@@ -131,11 +131,24 @@ export async function getActiveChallenge(userId: string): Promise<Challenge | nu
   return data as Challenge;
 }
 
+/**
+ * Count consecutive achieved days from today backwards using weekly stats.
+ * Exported for use in GamificationContext so streak is in sync with weeklyStats.
+ */
+export function computeStreakFromWeeklyStats(
+  weeklyStats: { date: string; stats: DailyStats; achieved: boolean }[]
+): number {
+  if (!weeklyStats.length) return 0;
+  let count = 0;
+  for (let i = weeklyStats.length - 1; i >= 0 && weeklyStats[i].achieved; i--) {
+    count++;
+  }
+  return count;
+}
+
 export async function calculateStreak(userId: string): Promise<number> {
-  // Logic to calculate streak based on activity logs (meals, exercises, etc.)
-  // For now, returning the stored streak from user_progress
-  const progress = await getUserProgress(userId);
-  return progress?.streak || 0;
+  const weeklyStats = await getWeeklyStats(userId);
+  return computeStreakFromWeeklyStats(weeklyStats);
 }
 
 export async function checkWeightBadges(data: {
@@ -193,27 +206,20 @@ export const getUserProgressAsync = getUserProgress;
 export const getUserBadgesAsync = getUserBadges;
 export const getWeeklyChallenge = getActiveChallenge;
 
-export async function getWeeklyStats(userId: string) {
-  // Mock implementation for UI stability
-  // In a real implementation, this would query daily_logs table
-  const stats = [];
-  for (let i = 6; i >= 0; i--) {
-    const date = new Date();
-    date.setDate(date.getDate() - i);
-    const dateStr = date.toISOString().split('T')[0];
-
-    stats.push({
-      date: dateStr,
-      stats: {
-        caloriesConsumed: 0,
-        caloriesBurned: 0,
-        proteinConsumed: 0,
-        carbsConsumed: 0,
-        fatsConsumed: 0,
-        waterConsumed: 0
-      },
-      achieved: false // Default to false until real logic is implemented
-    });
+export async function getWeeklyStats(userId: string): Promise<{ date: string; stats: DailyStats; achieved: boolean }[]> {
+  const entries = await getWeeklyStatsFromLogs(userId);
+  const withAchieved = entries.map(({ date, stats }) => ({
+    date,
+    stats,
+    achieved: (stats.caloriesConsumed > 0 || stats.waterConsumed > 0)
+  }));
+  const streak = computeStreakFromWeeklyStats(withAchieved);
+  const progress = await getUserProgress(userId);
+  if (progress && progress.streak !== streak) {
+    await supabase
+      .from(TABLE_USER_PROGRESS)
+      .update({ streak })
+      .eq('user_id', userId);
   }
-  return stats;
+  return withAchieved;
 }

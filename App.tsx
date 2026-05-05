@@ -7,7 +7,6 @@ import RegisterMeal from './pages/RegisterMeal';
 import RegisterExercise from './pages/RegisterExercise';
 import Recipes from './pages/Recipes';
 import MealPlanner from './pages/MealPlanner';
-import Planning from './pages/Planning';
 import Progress from './pages/Progress';
 import Awards from './pages/Awards';
 import Notifications from './pages/Notifications';
@@ -58,9 +57,7 @@ const AppLayout: React.FC<{ children: React.ReactNode; currentPath: NavItem; onN
       <div className="flex-1 lg:ml-72 flex flex-col min-h-screen transition-all duration-500 ease-in-out overflow-x-hidden min-w-0">
         <div className="lg:hidden p-4 bg-white/80 backdrop-blur-md border-b border-gray-100 flex items-center justify-between sticky top-0 z-10 shadow-sm">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-nutri-500 to-nutri-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-nutri-500/20">
-              <span className="font-heading font-bold text-xs">NS</span>
-            </div>
+            <img src="/logo.png?v=2" alt="NutriSmart" className="w-10 h-10 rounded-xl object-contain object-center bg-transparent flex-shrink-0" />
             <span className="font-heading font-bold text-gray-900 tracking-tight">NutriSmart</span>
           </div>
           <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-gray-500 hover:bg-gray-100 rounded-xl transition-colors">
@@ -106,7 +103,7 @@ const LoadingScreen: React.FC = () => (
 const AppContent: React.FC = () => {
   const { authUser, profile, signOut, refreshProfile } = useAuth();
   const { meals, exercises, stats, addMeal, updateMeal, deleteMeal, addExercise, updateExercise, deleteExercise, addWater } = useNutrition();
-  const { xp, level, streak, badges: unlockedAchievements, weeklyStats, addXP, showLevelUp, setShowLevelUp, newLevel } = useGamification();
+  const { xp, level, streak, badges: unlockedAchievements, weeklyStats, awardXP, showLevelUp, setShowLevelUp, newLevel } = useGamification();
 
   const toast = useToast();
   const [activeItem, setActiveItem] = useState<NavItem>(NavItem.Dashboard);
@@ -115,21 +112,20 @@ const AppContent: React.FC = () => {
   // Derive display user from profile or default
   const user = profile || DEFAULT_USER;
 
-  // Initialize notifications on mount
+  // Initialize notifications when clinical mode settings change
+  const profileId = profile?.id;
+  const isClinicalMode = profile?.isClinicalMode;
+  const clinicalSettings = profile?.clinicalSettings;
   useEffect(() => {
-    console.log("AppContent mounted, initializing...");
-    if (profile) {
-      try {
-        initializeNotifications(
-          (profile.isClinicalMode && profile.clinicalSettings)
-            ? profile.clinicalSettings
-            : undefined
-        );
-      } catch (error) {
-        console.error("Failed to initialize notifications:", error);
-      }
+    if (!profileId) return;
+    try {
+      initializeNotifications(
+        (isClinicalMode && clinicalSettings) ? clinicalSettings : undefined
+      );
+    } catch (error) {
+      console.error("Failed to initialize notifications:", error);
     }
-  }, [profile]);
+  }, [profileId, isClinicalMode, clinicalSettings]);
 
   // Handlers
   const handleUpdateWater = async (amount: number) => {
@@ -149,7 +145,7 @@ const AppContent: React.FC = () => {
       setActiveItem(NavItem.Dashboard);
 
       // Award XP
-      const xpResult = await addXP(XP_VALUES.LOG_MEAL, 'registerMeal');
+      await awardXP(XP_VALUES.LOG_MEAL, 'registerMeal');
       toast.success(`Refeição registrada! +${XP_VALUES.LOG_MEAL} XP 🍽️`);
     } catch (error) {
       console.error('handleAddMeal: Error saving meal:', error);
@@ -159,12 +155,21 @@ const AppContent: React.FC = () => {
 
   const handleUpdateMeal = async (updatedMeal: Meal) => {
     try {
+      console.log('[handleUpdateMeal] Atualizando refeição:', updatedMeal.id, {
+        name: updatedMeal.name,
+        calories: updatedMeal.calories,
+        protein: updatedMeal.macros?.protein,
+        carbs: updatedMeal.macros?.carbs,
+        fats: updatedMeal.macros?.fats,
+        ingredientsCount: updatedMeal.ingredients?.length,
+      });
       await updateMeal(updatedMeal.id, updatedMeal);
-      // await refreshProfile(); // Refresh profile/context if needed
       toast.success('Refeição atualizada com sucesso!');
-      setActiveItem(NavItem.Dashboard);
     } catch (error) {
-      toast.error('Erro ao atualizar refeição.');
+      console.error('[handleUpdateMeal] Erro:', error);
+      const msg = error instanceof Error ? error.message : 'Erro desconhecido';
+      toast.error(`Erro ao atualizar refeição: ${msg}`);
+      throw error; // Re-lança para que o RegisterMeal saiba que falhou e NÃO resete o form
     }
   };
 
@@ -182,7 +187,7 @@ const AppContent: React.FC = () => {
       await addExercise(newExercise);
 
       // Award XP
-      const xpResult = await addXP(XP_VALUES.LOG_EXERCISE, 'registerExercise');
+      await awardXP(XP_VALUES.LOG_EXERCISE, 'registerExercise');
       toast.success(`Exercício registrado! +${XP_VALUES.LOG_EXERCISE} XP 🏋️`);
     } catch (error) {
       toast.error('Erro ao salvar exercício');
@@ -272,8 +277,6 @@ const AppContent: React.FC = () => {
         return <Recipes />;
       case NavItem.MealPlanner:
         return <MealPlanner user={user} />;
-      case NavItem.Planning:
-        return <Planning user={user} />;
       case NavItem.Progress:
         return <Progress weightHistory={[{ day: 'Hoje', weight: user.weight || 0 }]} />;
       case NavItem.Assistant:
@@ -316,7 +319,7 @@ const AppContent: React.FC = () => {
   return (
     <AppLayout currentPath={activeItem} onNavigate={setActiveItem}>
       {renderContent()}
-      <AIChat user={user} stats={stats} meals={meals} />
+      <AIChat user={user} stats={stats} meals={meals} currentPath={activeItem} />
       <LevelUpModal
         isOpen={showLevelUp}
         newLevel={newLevel}

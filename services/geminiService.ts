@@ -30,15 +30,6 @@ export async function callGeminiApi(action: string, payload: Record<string, unkn
   return data.result || '';
 }
 
-export const generateNutritionAdvice = async (prompt: string, context?: UserContext): Promise<string> => {
-  try {
-    return await callGeminiApi('chat', { message: prompt, context });
-  } catch (error) {
-    console.error("Erro ao consultar Gemini:", error);
-    return "Ocorreu um erro ao conectar com o assistente inteligente. Tente novamente mais tarde.";
-  }
-};
-
 // Chat conversation with history
 export const generateChatResponse = async (
   message: string,
@@ -128,28 +119,43 @@ export const generateDayMealPlan = async (
   }
 };
 
-// Legacy function for compatibility
-export const generateWeeklyMealPlan = async (user: User): Promise<unknown[]> => {
+export interface WeeklyMealPlanDay {
+  dayName: string;
+  date?: string;
+  meals: {
+    type: string;
+    name: string;
+    calories: number;
+    protein: number;
+    carbs: number;
+    fats: number;
+    ingredients: { name: string; quantity: string; unit: string }[];
+    instructions: string[];
+    prepTime: number;
+  }[];
+}
+
+// Gera a semana inteira em uma única chamada à API
+export const generateWeeklyMealPlan = async (
+  user: User,
+  preferences: {
+    dietType: string;
+    allergies: string[];
+    dislikedFoods: string[];
+    mealsPerDay: number;
+    cookingTime: string;
+  },
+  weekDates: { date: string; dayName: string }[]
+): Promise<{ days: WeeklyMealPlanDay[] } | null> => {
   try {
-    const result = await callGeminiApi('generate-meal-plan', {
-      user,
-      preferences: {
-        dietType: 'normal',
-        allergies: [],
-        dislikedFoods: [],
-        mealsPerDay: 4,
-        cookingTime: 'normal',
-      },
-      dayName: 'hoje',
-    });
-    if (result) {
-      const parsed = JSON.parse(result);
-      return parsed.meals || [];
-    }
-    return [];
+    const result = await callGeminiApi('generate-weekly-meal-plan', { user, preferences, weekDays: weekDates });
+    if (!result) return null;
+    const parsed = JSON.parse(result);
+    if (!parsed.days || !Array.isArray(parsed.days)) return null;
+    return { days: parsed.days };
   } catch (error) {
-    console.error("Erro ao gerar plano:", error);
-    return [];
+    console.error("Erro ao gerar plano semanal:", error);
+    return null;
   }
 };
 

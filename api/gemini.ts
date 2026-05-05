@@ -12,8 +12,65 @@ const supabase = SUPABASE_URL && SUPABASE_ANON_KEY
     ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
     : null;
 
+// CORS origin (restrito em prod, aberto em dev)
+const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || '*';
+
+// =====================================================
+// RATE LIMITING (in-memory, per serverless instance)
+// Em prod na Vercel cada cold start reseta; suficiente para MVP.
+// Para escala, migrar para Redis/Upstash.
+// =====================================================
+interface RateLimitEntry {
+    count: number;
+    resetAt: number;
+}
+
+const rateLimitMap = new Map<string, RateLimitEntry>();
+
+// Limites por action (requests por hora)
+const RATE_LIMITS: Record<string, number> = {
+    'analyze-food': 20,
+    'chat': 60,
+    'calculate-nutrition': 30,
+    'generate-meal-plan': 15,
+    'generate-weekly-meal-plan': 15,
+    'generate-recipes': 15,
+    'generate-shopping-list': 15,
+    'generate-clinical-summary': 10,
+};
+const DEFAULT_RATE_LIMIT = 30;
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hora
+
+function checkRateLimit(key: string, action: string): { allowed: boolean; remaining: number } {
+    const now = Date.now();
+    const limit = RATE_LIMITS[action] || DEFAULT_RATE_LIMIT;
+    const fullKey = `${key}:${action}`;
+    const entry = rateLimitMap.get(fullKey);
+
+    if (!entry || now > entry.resetAt) {
+        rateLimitMap.set(fullKey, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+        return { allowed: true, remaining: limit - 1 };
+    }
+
+    if (entry.count >= limit) {
+        return { allowed: false, remaining: 0 };
+    }
+
+    entry.count++;
+    return { allowed: true, remaining: limit - entry.count };
+}
+
+function getRateLimitKey(req: { headers: Record<string, string | string[] | undefined>; body?: { payload?: { userId?: string } } }): string {
+    // Preferir userId se autenticado, senão IP
+    const userId = req.body?.payload?.userId;
+    if (userId && typeof userId === 'string') return `user:${userId}`;
+    const forwarded = req.headers['x-forwarded-for'];
+    const ip = typeof forwarded === 'string' ? forwarded.split(',')[0].trim() : (req.headers['x-real-ip'] as string) || 'unknown';
+    return `ip:${ip}`;
+}
+
 interface GeminiRequest {
-    action: 'chat' | 'analyze-food' | 'calculate-nutrition' | 'generate-meal-plan' | 'generate-recipes' | 'generate-shopping-list' | 'generate-clinical-summary';
+    action: 'chat' | 'analyze-food' | 'calculate-nutrition' | 'generate-meal-plan' | 'generate-weekly-meal-plan' | 'generate-recipes' | 'generate-shopping-list' | 'generate-clinical-summary';
     payload: Record<string, unknown>;
 }
 
@@ -186,7 +243,14 @@ CAPACIDADES:
     if (context) {
         const { user, stats, recentMeals } = context;
         const mealsSummary = recentMeals.map(m => `${m.name} (${m.calories}kcal)`).join(', ');
-        const caloriesRemaining = user.dailyCalorieGoal - stats.caloriesConsumed;
+        // Align with dashboard: exercise calories mode (none for weight loss/clinical, half/full by preference)
+        const rawGoal = user.goal;
+        const goal = !rawGoal ? undefined : (rawGoal === 'perder_peso' || rawGoal === 'Perder Peso' ? 'perder_peso' : rawGoal === 'ganhar_massa' || rawGoal === 'Ganhar Massa Muscular' ? 'ganhar_massa' : rawGoal === 'manter_peso' || rawGoal === 'Manter Peso' ? 'manter_peso' : rawGoal);
+        const isClinical = user.isClinicalMode;
+        const pref = (user as { addExerciseCaloriesToRemaining?: 'none' | 'half' | 'full' }).addExerciseCaloriesToRemaining;
+        const mode = (isClinical || goal === 'perder_peso') ? 'none' : (pref ?? (goal === 'ganhar_massa' ? 'half' : 'full'));
+        const toAdd = mode === 'none' ? 0 : mode === 'half' ? stats.caloriesBurned * 0.5 : stats.caloriesBurned;
+        const caloriesRemaining = Math.max(0, user.dailyCalorieGoal - stats.caloriesConsumed + toAdd);
         const waterProgress = Math.round((stats.waterConsumed / user.dailyWaterGoal) * 100);
 
         systemInstruction += `
@@ -337,13 +401,22 @@ async function handleCalculateNutrition(payload: Record<string, unknown>): Promi
     return callGemini(MODELS.LOGIC, prompt, undefined, schema);
 }
 
+// Mapeia goal interno para frase clara no prompt
+function getGoalDescription(goal: string | undefined): string {
+    const g = (goal || '').toLowerCase();
+    if (g === 'perder_peso' || g === 'perder peso') return 'Perda de peso (déficit calórico)';
+    if (g === 'ganhar_massa' || g === 'ganhar massa') return 'Ganho de massa magra (superávit controlado)';
+    if (g === 'manter_peso' || g === 'manter peso') return 'Manutenção de peso (equilíbrio calórico)';
+    return goal || 'Saúde geral';
+}
+
 // Handler for meal plan generation
 async function handleGenerateMealPlan(payload: Record<string, unknown>): Promise<string> {
     const { user, preferences, dayName } = payload as {
         user: {
             dailyCalorieGoal: number;
             goal?: string;
-            macros: { protein: number };
+            macros: { protein: number; carbs?: number; fats?: number };
             isClinicalMode?: boolean;
             clinicalSettings?: { medication: string };
         };
@@ -356,6 +429,10 @@ async function handleGenerateMealPlan(payload: Record<string, unknown>): Promise
         };
         dayName: string;
     };
+
+    const protein = user.macros?.protein ?? 0;
+    const carbs = user.macros?.carbs ?? 0;
+    const fats = user.macros?.fats ?? 0;
 
     const mealTypes = preferences.mealsPerDay === 3
         ? ['Café da Manhã', 'Almoço', 'Jantar']
@@ -381,8 +458,8 @@ async function handleGenerateMealPlan(payload: Record<string, unknown>): Promise
     
 PERFIL DO USUÁRIO:
 - Meta calórica: ${user.dailyCalorieGoal} kcal/dia
-- Meta de proteína: ${user.macros.protein}g
-- Objetivo: ${user.goal || 'Saúde geral'}
+- Metas de macronutrientes por dia: proteína ${protein}g, carboidratos ${carbs}g, gorduras ${fats}g. As refeições do dia devem somar aproximadamente essas metas.
+- Objetivo: ${getGoalDescription(user.goal)}
 
 PREFERÊNCIAS:
 - Tipo de dieta: ${dietDescriptions[preferences.dietType] || 'normal'}
@@ -392,14 +469,14 @@ PREFERÊNCIAS:
 
 Crie ${preferences.mealsPerDay} refeições: ${mealTypes.join(', ')}.
 Cada refeição deve ter ingredientes específicos com quantidades em gramas/ml e instruções de preparo.
-As calorias totais do dia devem somar aproximadamente ${user.dailyCalorieGoal} kcal.`;
+As calorias totais do dia devem somar aproximadamente ${user.dailyCalorieGoal} kcal e respeitar as metas de macros.`;
 
     if (user.isClinicalMode) {
         prompt += `
         
 ATENÇÃO - MODO CLÍNICO (${user?.clinicalSettings?.medication || 'Tratamento'}):
 Este plano deve ser adaptado para quem usa medicação para perda de peso (GLP-1).
-1. PRIORIDADE TOTAL EM PROTEÍNA: Garanta que a meta de proteína seja atingida ou superada para preservar massa magra.
+1. PRIORIDADE TOTAL EM PROTEÍNA: A meta de proteína (${protein}g) deve ser atingida ou superada para preservar massa magra.
 2. ALTA SACIEDADE COM POUCO VOLUME: Use alimentos densos em nutrientes, pois o apetite pode estar reduzido.
 3. INGESTÃO DE FIBRAS: Inclua fibras para auxiliar o intestino, mas evite excesso de gordura na mesma refeição.
 4. EVITAR NÁUSEAS: Evite refeições muito volumosas ou muito gordurosas.
@@ -446,6 +523,121 @@ Este plano deve ser adaptado para quem usa medicação para perda de peso (GLP-1
         required: ['meals']
     };
     // Use LOGIC model (Gemini 3 Flash) for complex meal planning
+    return callGemini(MODELS.LOGIC, prompt, undefined, schema);
+}
+
+const MEAL_ITEM_SCHEMA = {
+    type: 'OBJECT',
+    properties: {
+        type: { type: 'STRING', description: 'Tipo da refeição' },
+        name: { type: 'STRING', description: 'Nome da refeição/receita' },
+        calories: { type: 'NUMBER' },
+        protein: { type: 'NUMBER' },
+        carbs: { type: 'NUMBER' },
+        fats: { type: 'NUMBER' },
+        prepTime: { type: 'NUMBER', description: 'Tempo de preparo em minutos' },
+        ingredients: {
+            type: 'ARRAY',
+            items: {
+                type: 'OBJECT',
+                properties: {
+                    name: { type: 'STRING' },
+                    quantity: { type: 'STRING' },
+                    unit: { type: 'STRING' }
+                },
+                required: ['name', 'quantity', 'unit']
+            }
+        },
+        instructions: {
+            type: 'ARRAY',
+            items: { type: 'STRING' },
+            description: 'Passos do modo de preparo'
+        }
+    },
+    required: ['type', 'name', 'calories', 'protein', 'carbs', 'fats', 'ingredients', 'instructions', 'prepTime']
+};
+
+// Handler for full week meal plan (one API call)
+async function handleGenerateWeeklyMealPlan(payload: Record<string, unknown>): Promise<string> {
+    const { user, preferences, weekDays } = payload as {
+        user: { dailyCalorieGoal: number; goal?: string; macros: { protein: number; carbs?: number; fats?: number }; isClinicalMode?: boolean; clinicalSettings?: { medication: string } };
+        preferences: { dietType: string; allergies: string[]; dislikedFoods: string[]; mealsPerDay: number; cookingTime: string };
+        weekDays: { date: string; dayName: string }[];
+    };
+
+    const protein = user.macros?.protein ?? 0;
+    const carbs = user.macros?.carbs ?? 0;
+    const fats = user.macros?.fats ?? 0;
+
+    const mealTypes = preferences.mealsPerDay === 3
+        ? ['Café da Manhã', 'Almoço', 'Jantar']
+        : preferences.mealsPerDay === 4
+            ? ['Café da Manhã', 'Almoço', 'Lanche', 'Jantar']
+            : ['Café da Manhã', 'Lanche da Manhã', 'Almoço', 'Lanche da Tarde', 'Jantar'];
+
+    const dietDescriptions: Record<string, string> = {
+        normal: 'alimentação balanceada comum',
+        vegetarian: 'vegetariano (sem carne, mas permite ovos e laticínios)',
+        vegan: 'vegano (sem nenhum produto animal)',
+        lowCarb: 'low carb (menos de 50g de carboidratos por dia)',
+        highProtein: 'alto teor proteico (foco em proteínas magras)',
+    };
+
+    const cookingDescriptions: Record<string, string> = {
+        quick: 'receitas rápidas (máximo 20 minutos)',
+        normal: 'tempo de preparo normal (até 40 minutos)',
+        elaborate: 'receitas elaboradas (pode levar mais tempo)',
+    };
+
+    const daysList = (weekDays || []).map(d => `${d.dayName} (${d.date})`).join(', ');
+
+    let prompt = `Crie um plano alimentar para a semana inteira. Cada dia deve ter refeições que respeitem as metas abaixo.
+
+DIAS A PLANEJAR (em ordem): ${daysList}
+
+PERFIL DO USUÁRIO:
+- Meta calórica: ${user.dailyCalorieGoal} kcal/dia
+- Metas de macronutrientes por dia: proteína ${protein}g, carboidratos ${carbs}g, gorduras ${fats}g. As refeições de cada dia devem somar aproximadamente essas metas.
+- Objetivo: ${getGoalDescription(user.goal)}
+
+PREFERÊNCIAS:
+- Tipo de dieta: ${dietDescriptions[preferences.dietType] || 'normal'}
+- Restrições alimentares: ${preferences.allergies.length > 0 ? preferences.allergies.join(', ') : 'Nenhuma'}
+- Alimentos que não gosta: ${preferences.dislikedFoods.length > 0 ? preferences.dislikedFoods.join(', ') : 'Nenhum'}
+- Tempo de preparo: ${cookingDescriptions[preferences.cookingTime] || 'normal'}
+
+Para CADA um dos ${(weekDays || []).length} dias, crie ${preferences.mealsPerDay} refeições: ${mealTypes.join(', ')}.
+Cada refeição deve ter ingredientes específicos com quantidades em gramas/ml e instruções de preparo.
+Varie as refeições entre os dias para não repetir os mesmos pratos. As calorias totais de cada dia devem somar aproximadamente ${user.dailyCalorieGoal} kcal.`;
+
+    if (user.isClinicalMode) {
+        prompt += `
+
+ATENÇÃO - MODO CLÍNICO (${user?.clinicalSettings?.medication || 'Tratamento'}):
+Adapte todos os dias para quem usa medicação para perda de peso (GLP-1).
+1. PRIORIDADE EM PROTEÍNA: A meta de proteína (${protein}g) por dia deve ser atingida ou superada.
+2. ALTA SACIEDADE COM POUCO VOLUME. 3. FIBRAS sem excesso de gordura. 4. EVITAR refeições muito volumosas ou gordurosas. 5. Sugira hidratação.`;
+    }
+
+    const schema = {
+        type: 'OBJECT',
+        properties: {
+            days: {
+                type: 'ARRAY',
+                items: {
+                    type: 'OBJECT',
+                    properties: {
+                        dayName: { type: 'STRING' },
+                        date: { type: 'STRING' },
+                        meals: { type: 'ARRAY', items: MEAL_ITEM_SCHEMA }
+                    },
+                    required: ['dayName', 'meals']
+                }
+            }
+        },
+        required: ['days']
+    };
+
     return callGemini(MODELS.LOGIC, prompt, undefined, schema);
 }
 
@@ -550,8 +742,8 @@ Retorne apenas o texto do resumo, sem formatação especial.`;
 
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-    // CORS headers
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    // CORS headers (restrito em prod via env var ALLOWED_ORIGIN)
+    res.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
@@ -572,6 +764,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try {
         const { action, payload } = req.body as GeminiRequest;
 
+        // Rate limiting
+        const rateLimitKey = getRateLimitKey(req as any);
+        const { allowed, remaining } = checkRateLimit(rateLimitKey, action);
+        res.setHeader('X-RateLimit-Remaining', remaining.toString());
+
+        if (!allowed) {
+            return res.status(429).json({
+                error: 'Você atingiu o limite de requisições. Aguarde alguns minutos e tente novamente.'
+            });
+        }
+
         let result: string;
 
         switch (action) {
@@ -586,6 +789,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 break;
             case 'generate-meal-plan':
                 result = await handleGenerateMealPlan(payload);
+                break;
+            case 'generate-weekly-meal-plan':
+                result = await handleGenerateWeeklyMealPlan(payload);
                 break;
             case 'generate-recipes':
                 result = await handleGenerateRecipes(payload);

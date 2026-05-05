@@ -56,6 +56,7 @@ export interface OnboardingData {
     // Weight goal fields (optional)
     weightGoal?: WeightGoal;
     weightHistory?: WeightEntry[];
+    addExerciseCaloriesToRemaining?: 'none' | 'half' | 'full';
 }
 
 const Onboarding: React.FC<OnboardingProps> = ({ userName, onComplete }) => {
@@ -182,7 +183,8 @@ const Onboarding: React.FC<OnboardingProps> = ({ userName, onComplete }) => {
                 isClinicalMode,
                 clinicalSettings,
                 weightGoal: weightGoalData,
-                weightHistory: weight > 0 ? [{ date: getLocalDateString(), weight, source: 'manual' as const }] : []
+                weightHistory: weight > 0 ? [{ date: getLocalDateString(), weight, source: 'manual' as const }] : [],
+                ...(goal === 'ganhar_massa' && { addExerciseCaloriesToRemaining: 'half' as const })
             });
         } finally {
             setIsSubmitting(false);
@@ -254,6 +256,15 @@ const Onboarding: React.FC<OnboardingProps> = ({ userName, onComplete }) => {
                             <div className="text-center mb-8">
                                 <h2 className="font-heading font-bold text-2xl text-gray-900">Qual é o seu objetivo?</h2>
                                 <p className="text-sm text-gray-400 mt-2">Escolha o que melhor descreve sua jornada</p>
+                            </div>
+
+                            {/* Disclaimer de Saúde */}
+                            <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl">
+                                <p className="text-xs text-amber-800 leading-relaxed text-center">
+                                    <strong>Aviso importante:</strong> O NutriSmart é uma ferramenta de apoio.
+                                    Não substitui orientação médica ou nutricional. Consulte um profissional
+                                    de saúde antes de fazer mudanças na sua dieta.
+                                </p>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

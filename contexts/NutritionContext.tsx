@@ -6,6 +6,7 @@ import * as mealService from '../services/mealService';
 import * as exerciseService from '../services/exerciseService';
 import { useAuth } from './AuthContext';
 import { getDailyLog, updateWaterConsumed } from '../services/healthService';
+import { getLocalDateString } from '../utils/dateUtils';
 
 interface NutritionContextType {
     meals: Meal[];
@@ -47,7 +48,7 @@ export function NutritionProvider({ children }: { children: React.ReactNode }) {
         }
         setLoading(true);
         try {
-            const today = new Date().toISOString().split('T')[0];
+            const today = getLocalDateString();
             const todayMeals = await mealService.getMeals(authUser.id, today);
             const todayExercises = await exerciseService.getExercises(authUser.id, today);
             const todayLog = await getDailyLog(authUser.id, today);
@@ -87,7 +88,9 @@ export function NutritionProvider({ children }: { children: React.ReactNode }) {
     };
 
     const updateMeal = async (id: string, updates: Partial<Meal>) => {
+        // updateMeal agora lança erro se falhar — o chamador (App.tsx) trata no catch
         await mealService.updateMeal(id, updates);
+        // Só atualiza o contexto se o update realmente persistiu
         await refreshNutrition();
     };
 
@@ -117,7 +120,7 @@ export function NutritionProvider({ children }: { children: React.ReactNode }) {
         const newAmount = waterConsumed + amount;
         setWaterConsumed(newAmount);
 
-        const today = new Date().toISOString().split('T')[0];
+        const today = getLocalDateString();
         await updateWaterConsumed(authUser.id, today, newAmount);
         await refreshNutrition();
     };

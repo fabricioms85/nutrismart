@@ -1,10 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   LayoutDashboard,
   Utensils,
   Dumbbell,
   ChefHat,
-  CalendarDays,
   CalendarCheck,
   TrendingUp,
   Sparkles,
@@ -13,10 +12,12 @@ import {
   CreditCard,
   LogOut,
   ChevronRight,
-  Menu
+  Menu,
+  HelpCircle
 } from 'lucide-react';
 import { NavItem } from '../types';
 import { useAuth } from '../contexts/AuthContext';
+import SupportForm from './SupportForm';
 
 interface SidebarProps {
   activeItem: NavItem;
@@ -27,6 +28,7 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ activeItem, onNavigate, isOpen, setIsOpen }) => {
   const { profile, signOut } = useAuth();
+  const [showSupport, setShowSupport] = useState(false);
 
   const menuItems = [
     { id: NavItem.Dashboard, icon: LayoutDashboard, label: 'Dashboard' },
@@ -34,12 +36,11 @@ const Sidebar: React.FC<SidebarProps> = ({ activeItem, onNavigate, isOpen, setIs
     { id: NavItem.RegisterExercise, icon: Dumbbell, label: 'Exercícios' },
     { id: NavItem.Recipes, icon: ChefHat, label: 'Receitas' },
     { id: NavItem.MealPlanner, icon: CalendarCheck, label: 'Planejador Semanal' },
-    { id: NavItem.Planning, icon: CalendarDays, label: 'Planejamento' },
     { id: NavItem.Progress, icon: TrendingUp, label: 'Progresso' },
   ];
 
   const secondaryItems = [
-    { id: NavItem.Assistant, icon: Sparkles, label: 'Assistente IA' },
+    { id: NavItem.Assistant, icon: Sparkles, label: 'NutriAI' },
     { id: NavItem.Awards, icon: Trophy, label: 'Conquistas' },
     { id: NavItem.Notifications, icon: Bell, label: 'Notificações' },
     { id: NavItem.Plans, icon: CreditCard, label: 'Planos' },
@@ -71,9 +72,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeItem, onNavigate, isOpen, setIs
         {/* Logo Area - Absolute Top */}
         <div className="p-8 pb-4 relative z-10">
           <div className="flex items-center gap-3 mb-8 group cursor-pointer">
-            <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-white bg-gradient-to-br from-nutri-500 to-nutri-600 shadow-lg shadow-nutri-500/30 transform group-hover:rotate-6 transition-transform duration-500">
-              <span className="font-heading font-bold text-xl">N</span>
-            </div>
+            <img src="/logo.png?v=2" alt="NutriSmart" className="w-12 h-12 rounded-2xl object-contain object-center bg-transparent transform group-hover:rotate-6 transition-transform duration-500" />
             <div>
               <h1 className="font-heading font-extrabold text-2xl text-gray-900 leading-none tracking-tight">NutriSmart</h1>
               <p className="text-[10px] font-bold text-nutri-500 tracking-widest uppercase mt-1 bg-nutri-50 inline-block px-2 py-0.5 rounded-full">Premium</p>
@@ -162,7 +161,14 @@ const Sidebar: React.FC<SidebarProps> = ({ activeItem, onNavigate, isOpen, setIs
         </div>
 
         {/* Footer Area - Bottom */}
-        <div className="p-6 pt-2">
+        <div className="p-6 pt-2 space-y-3">
+          <button
+            onClick={() => { setShowSupport(true); setIsOpen(false); }}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-xs font-bold text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-all duration-300"
+          >
+            <HelpCircle size={16} />
+            <span>Ajuda / Suporte</span>
+          </button>
           <button
             onClick={handleLogout}
             className="w-full flex items-center justify-center gap-2 px-4 py-3.5 rounded-2xl text-xs font-bold text-red-400 bg-red-50/50 hover:bg-red-50 hover:text-red-500 hover:scale-[1.02] transition-all duration-300"
@@ -170,7 +176,13 @@ const Sidebar: React.FC<SidebarProps> = ({ activeItem, onNavigate, isOpen, setIs
             <LogOut size={16} />
             <span>Sair da Conta</span>
           </button>
+          <p className="text-[10px] text-gray-400 text-center leading-tight px-2">
+            Ferramenta de apoio. Não substitui orientação médica ou nutricional.
+          </p>
         </div>
+
+        {/* Support Form Modal */}
+        <SupportForm isOpen={showSupport} onClose={() => setShowSupport(false)} />
 
       </aside>
     </>

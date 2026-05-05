@@ -2,12 +2,15 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Area, AreaChart, ReferenceLine } from 'recharts';
 import { TrendingUp, TrendingDown, Plus, Calendar, Target, Flame, Activity, ChevronDown, Share2, Download, Loader2, Trophy, Zap, Flag } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
 import { getWeightHistory, addWeightEntry } from '../services/weightService';
+import { updateProfile } from '../services/profileService';
 import { calculateStreak } from '../services/gamificationService';
-import { getWeeklyStats } from '../services/statsService';
+import { getStatsForPeriod } from '../services/statsService';
 import { getMeals } from '../services/mealService';
+import { getExercisesInPeriod } from '../services/exerciseService';
 
-import { generateWeeklySummaryImage, shareImage, getWeekRange, isShareSupported } from '../services/shareService';
+import { generateProgressReportImage, shareImage, getWeekRange, getPeriodLabel, isShareSupported } from '../services/shareService';
 import WeightModal from '../components/WeightModal';
 import { WeightGoal } from '../types';
 
@@ -25,7 +28,8 @@ interface CalorieEntry {
 type PeriodFilter = 7 | 14 | 30 | 90;
 
 const Progress: React.FC = () => {
-  const { authUser, profile } = useAuth();
+  const { authUser, profile, refreshProfile } = useAuth();
+  const toast = useToast();
   const [weightHistory, setWeightHistory] = useState<WeightEntry[]>([]);
   const [calorieHistory, setCalorieHistory] = useState<CalorieEntry[]>([]);
   const [streak, setStreak] = useState(0);
@@ -43,21 +47,19 @@ const Progress: React.FC = () => {
     setLoading(true);
 
     try {
-      // Fetch weight history
+      // Fetch weight history (getWeightHistory já retorna ascending: mais antigo primeiro)
       const weightData = await getWeightHistory(authUser.id, period);
-      // Reverse to show oldest first for chart
-      const reversedWeight = [...weightData].reverse();
 
-      // Format dates for display
-      const formattedWeight = reversedWeight.map(entry => ({
+      // Formatar para o gráfico: esquerda = mais antigo, direita = mais recente
+      const formattedWeight = weightData.map(entry => ({
         day: formatDate(entry.date),
-        weight: entry.weight,
+        weight: Number(entry.weight),
       }));
       setWeightHistory(formattedWeight);
 
-      // Fetch calorie history
-      const weeklyData = await getWeeklyStats(authUser.id);
-      const formattedCalories = weeklyData.map(entry => ({
+      // Fetch calorie (and water) history for the selected period
+      const periodStats = await getStatsForPeriod(authUser.id, period);
+      const formattedCalories = periodStats.map(entry => ({
         day: formatDate(entry.date),
         calories: entry.stats.caloriesConsumed,
         goal: profile?.dailyCalorieGoal || 2000,
@@ -72,9 +74,20 @@ const Progress: React.FC = () => {
       const meals = await getMeals(authUser.id);
       setTotalMeals(meals.length);
 
-      // Calculate total water and exercise from weekly stats
-      const waterTotal = weeklyData.reduce((sum, d) => sum + d.stats.waterConsumed, 0);
-      setTotalWater(Math.round(waterTotal / 7));
+      // Average water per day over the period
+      const waterTotal = periodStats.reduce((sum, d) => sum + d.stats.waterConsumed, 0);
+      setTotalWater(period > 0 ? Math.round(waterTotal / period) : 0);
+
+      // Total exercise minutes in the period (for report and summary)
+      const today = new Date();
+      const periodStart = new Date(today);
+      periodStart.setDate(today.getDate() - (period - 1));
+      const toLocalDateStr = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const dateFrom = toLocalDateStr(periodStart);
+      const dateTo = toLocalDateStr(today);
+      const periodExercises = await getExercisesInPeriod(authUser.id, dateFrom, dateTo);
+      const exerciseMins = periodExercises.reduce((sum, e) => sum + (e.durationMinutes || 0), 0);
+      setTotalExerciseMinutes(exerciseMins);
     } catch (error) {
       console.error('Error fetching progress data:', error);
     } finally {
@@ -86,17 +99,22 @@ const Progress: React.FC = () => {
     fetchData();
   }, [fetchData]);
 
+  // Parse YYYY-MM-DD as local date (evita dia anterior em fusos UTC− como Brasil)
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
+    const date = new Date(dateStr + 'T12:00:00');
     const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
     return days[date.getDay()] + ' ' + date.getDate();
   };
 
   const handleAddWeight = async (weight: number, date: string) => {
     if (!authUser) return;
-    const success = await addWeightEntry(authUser.id, weight, date);
-    if (success) {
+    try {
+      await addWeightEntry(authUser.id, weight, date);
+      await updateProfile(authUser.id, { weight });
+      await refreshProfile();
       await fetchData();
+    } catch (err) {
+      console.error('Erro ao salvar peso:', err);
     }
   };
 
@@ -175,27 +193,70 @@ const Progress: React.FC = () => {
   }
 
   const handleShare = async () => {
-    if (!profile) return;
+    const showError = (msg: string) => {
+      try {
+        toast.error(msg);
+      } catch {
+        alert(msg);
+      }
+    };
+    const showSuccess = (msg: string) => {
+      try {
+        toast.success(msg);
+      } catch {
+        alert(msg);
+      }
+    };
+
+    if (!profile) {
+      showError('Carregue seu perfil para compartilhar.');
+      return;
+    }
+
     setIsSharing(true);
 
     try {
-      const summaryData = {
+      const waterGoal = profile.dailyWaterGoal ?? 2500;
+      const reportData = {
         userName: profile.name || 'Usuário NutriSmart',
-        weekRange: getWeekRange(),
-        caloriesAvg: avgCalories,
-        caloriesGoal: calorieGoal,
-        waterAvg: totalWater,
-        waterGoal: profile.dailyWaterGoal,
-        exerciseMinutes: totalExerciseMinutes,
-        weightChange: weightChange,
-        streak: streak,
-        mealsLogged: totalMeals,
+        period,
+        periodLabel: getPeriodLabel(period),
+        dateRange: getWeekRange(period),
+        generatedAt: new Date().toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }),
+        goals: {
+          calorieGoal,
+          waterGoal,
+          weightGoal: profile.weightGoal?.status === 'active' ? profile.weightGoal.targetWeight : undefined,
+          macros: profile.macros ?? { protein: 100, carbs: 250, fats: 70 },
+        },
+        summary: {
+          caloriesAvg: avgCalories,
+          caloriesPercent: calorieGoal > 0 ? Math.min(100, Math.round((avgCalories / calorieGoal) * 100)) : 0,
+          waterAvg: totalWater,
+          waterPercent: waterGoal > 0 ? Math.min(100, Math.round((totalWater / waterGoal) * 100)) : 0,
+          exerciseMinutes: totalExerciseMinutes,
+          streak,
+          weightStart: startWeight,
+          weightEnd: currentWeight,
+          weightChange,
+          mealsLogged: totalMeals,
+          isOnTrackCalories: isOnTrack,
+        },
+        weightSeries: weightHistory,
+        calorieSeries: calorieHistory.map(({ day, calories }) => ({ day, calories })),
       };
 
-      const blob = await generateWeeklySummaryImage(summaryData);
-      await shareImage(blob);
+      const blob = await generateProgressReportImage(reportData);
+      const shared = await shareImage(blob);
+
+      if (shared) {
+        showSuccess('Relatório compartilhado!');
+      } else {
+        showSuccess('Relatório gerado! Se o download não iniciou, verifique a pasta de downloads ou permita pop-ups para este site.');
+      }
     } catch (error) {
       console.error('Error sharing:', error);
+      showError('Não foi possível gerar o relatório. Tente novamente.');
     } finally {
       setIsSharing(false);
     }
@@ -210,8 +271,10 @@ const Progress: React.FC = () => {
         <div className="flex items-center gap-3">
           {/* Share Button */}
           <button
+            type="button"
             onClick={handleShare}
             disabled={isSharing}
+            aria-busy={isSharing}
             className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-nutri-500 to-nutri-600 text-white font-medium rounded-xl hover:shadow-lg hover:shadow-nutri-500/30 transition-all disabled:opacity-50"
           >
             {isSharing ? (
@@ -434,8 +497,8 @@ const Progress: React.FC = () => {
           </div>
 
           {weightHistory.length > 1 ? (
-            <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="h-72 min-h-[224px]">
+              <ResponsiveContainer width="100%" height="100%" minWidth={224} minHeight={224}>
                 <AreaChart data={weightHistory}>
                   <defs>
                     <linearGradient id="weightGradient" x1="0" y1="0" x2="0" y2="1">
@@ -516,12 +579,12 @@ const Progress: React.FC = () => {
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
             <h3 className="font-bold text-gray-900">Consumo Calórico</h3>
-            <span className="text-sm text-gray-500">Últimos 7 dias</span>
+            <span className="text-sm text-gray-500">{periodLabels[period]}</span>
           </div>
 
           {calorieHistory.length > 0 ? (
-            <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="h-72 min-h-[224px]">
+              <ResponsiveContainer width="100%" height="100%" minWidth={224} minHeight={224}>
                 <BarChart data={calorieHistory}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
                   <XAxis

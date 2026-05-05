@@ -60,6 +60,7 @@ export const GamificationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
             const fetchedWeeklyStats = await gamificationService.getWeeklyStats(authUser.id);
             setWeeklyStats(fetchedWeeklyStats);
+            setStreak(gamificationService.computeStreakFromWeeklyStats(fetchedWeeklyStats));
 
         } catch (error) {
             console.error("Failed to refresh gamification data", error);

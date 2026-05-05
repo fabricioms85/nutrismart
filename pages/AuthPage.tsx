@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
-import { Mail, Lock, User, Eye, EyeOff, Loader2, ArrowRight, Sparkles } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, Loader2, ArrowRight } from 'lucide-react';
+import LegalModal from '../components/legal/LegalModal';
+import TermsOfUseContent from '../components/legal/TermsOfUseContent';
+import PrivacyPolicyContent from '../components/legal/PrivacyPolicyContent';
 
 interface AuthPageProps {
     onSignIn: (email: string, password: string) => Promise<void>;
@@ -14,6 +17,8 @@ export default function AuthPage({ onSignIn, onSignUp }: AuthPageProps) {
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [showTerms, setShowTerms] = useState(false);
+    const [showPrivacy, setShowPrivacy] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -56,9 +61,7 @@ export default function AuthPage({ onSignIn, onSignUp }: AuthPageProps) {
             <div className="w-full max-w-md relative z-10 text-center">
                 {/* Logo */}
                 <div className="mb-8 transform hover:scale-105 transition-transform duration-500">
-                    <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-nutri-500 to-nutri-600 rounded-[2rem] shadow-xl shadow-nutri-500/30 mb-6 rotate-3">
-                        <Sparkles className="w-10 h-10 text-white" />
-                    </div>
+                    <img src="/logo.png?v=2" alt="NutriSmart" className="w-20 h-20 mx-auto mb-6 object-contain object-center bg-transparent" />
                     <h1 className="font-heading font-extrabold text-4xl text-gray-900 mb-2 tracking-tight">NutriSmart</h1>
                     <p className="text-gray-500 font-medium tracking-wide">Sua jornada saudável começa aqui</p>
                 </div>
@@ -175,9 +178,24 @@ export default function AuthPage({ onSignIn, onSignUp }: AuthPageProps) {
 
                 {/* Footer */}
                 <p className="text-center text-gray-400 text-xs mt-8">
-                    Ao continuar, você concorda com nossos <a href="#" className="underline hover:text-nutri-600">Termos de Uso</a> e <a href="#" className="underline hover:text-nutri-600">Política de Privacidade</a>
+                    Ao continuar, você concorda com nossos{' '}
+                    <button type="button" onClick={() => setShowTerms(true)} className="underline hover:text-nutri-600 transition-colors">
+                        Termos de Uso
+                    </button>{' '}
+                    e{' '}
+                    <button type="button" onClick={() => setShowPrivacy(true)} className="underline hover:text-nutri-600 transition-colors">
+                        Política de Privacidade
+                    </button>
                 </p>
             </div>
+
+            {/* Legal Modals */}
+            <LegalModal isOpen={showTerms} onClose={() => setShowTerms(false)} title="Termos de Uso">
+                <TermsOfUseContent />
+            </LegalModal>
+            <LegalModal isOpen={showPrivacy} onClose={() => setShowPrivacy(false)} title="Política de Privacidade">
+                <PrivacyPolicyContent />
+            </LegalModal>
         </div>
     );
 }

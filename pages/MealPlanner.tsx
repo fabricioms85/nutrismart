@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, ChefHat, ShoppingCart, RefreshCw, Loader2, Clock, Flame, ChevronRight, X, Settings2, Utensils, Check } from 'lucide-react';
 import { User } from '../types';
-import { generateDayMealPlan } from '../services/geminiService';
+import { generateWeeklyMealPlan } from '../services/geminiService';
 import {
     WeekPlan,
     DayPlan,
@@ -32,7 +32,6 @@ const MealPlanner: React.FC<MealPlannerProps> = ({ user }) => {
     const [showShoppingList, setShowShoppingList] = useState(false);
     const [shoppingList, setShoppingList] = useState<ShoppingItem[]>([]);
     const [isGenerating, setIsGenerating] = useState(false);
-    const [generatingDay, setGeneratingDay] = useState<string | null>(null);
 
     const weekDates = getWeekDates();
 
@@ -43,43 +42,50 @@ const MealPlanner: React.FC<MealPlannerProps> = ({ user }) => {
         }
     }, []);
 
+    const mapMealType = (type: string): PlannedMeal['type'] => {
+        const t = type.toLowerCase();
+        if (t.includes('café') || t.includes('cafe')) return 'breakfast';
+        if (t.includes('almoço')) return 'lunch';
+        if (t.includes('jantar')) return 'dinner';
+        return 'snack';
+    };
+
     const generatePlan = async () => {
         setIsGenerating(true);
 
         try {
-            const days: DayPlan[] = [];
+            const result = await generateWeeklyMealPlan(user, preferences, weekDates);
 
-            for (const { date, dayName } of weekDates) {
-                setGeneratingDay(dayName);
-
-                const result = await generateDayMealPlan(user, preferences, dayName);
-
-                if (result?.meals) {
-                    const totalCalories = result.meals.reduce((sum, m) => sum + (m.calories || 0), 0);
-                    const totalProtein = result.meals.reduce((sum, m) => sum + (m.protein || 0), 0);
-
-                    days.push({
-                        date,
-                        dayName,
-                        meals: result.meals.map(m => ({
-                            type: m.type.toLowerCase().includes('café') ? 'breakfast'
-                                : m.type.toLowerCase().includes('almoço') ? 'lunch'
-                                    : m.type.toLowerCase().includes('jantar') ? 'dinner'
-                                        : 'snack',
-                            name: m.name,
-                            calories: m.calories,
-                            protein: m.protein,
-                            carbs: m.carbs,
-                            fats: m.fats,
-                            ingredients: m.ingredients,
-                            instructions: m.instructions,
-                            prepTime: m.prepTime,
-                        })),
-                        totalCalories,
-                        totalProtein,
-                    });
-                }
+            if (!result?.days?.length) {
+                console.error('Resposta da API sem dias');
+                return;
             }
+
+            const days: DayPlan[] = weekDates.map(({ date, dayName }, index) => {
+                const apiDay = result.days[index] ?? result.days.find((d: { date?: string }) => d.date === date) ?? result.days[0];
+                const meals = (apiDay?.meals || []).map((m: { type: string; name: string; calories: number; protein: number; carbs: number; fats: number; ingredients: { name: string; quantity: string; unit: string }[]; instructions?: string[]; prepTime?: number }) => ({
+                    type: mapMealType(m.type),
+                    name: m.name,
+                    calories: m.calories ?? 0,
+                    protein: m.protein ?? 0,
+                    carbs: m.carbs ?? 0,
+                    fats: m.fats ?? 0,
+                    ingredients: m.ingredients ?? [],
+                    instructions: m.instructions,
+                    prepTime: m.prepTime,
+                }));
+
+                const totalCalories = meals.reduce((sum, m) => sum + m.calories, 0);
+                const totalProtein = meals.reduce((sum, m) => sum + m.protein, 0);
+
+                return {
+                    date,
+                    dayName,
+                    meals,
+                    totalCalories,
+                    totalProtein,
+                };
+            });
 
             const newPlan: WeekPlan = {
                 id: crypto.randomUUID(),
@@ -92,16 +98,13 @@ const MealPlanner: React.FC<MealPlannerProps> = ({ user }) => {
             setWeekPlan(newPlan);
             saveMealPlan(newPlan);
 
-            // Generate shopping list
             const list = generateShoppingList(newPlan);
             setShoppingList(list);
             saveShoppingList(list);
-
         } catch (error) {
             console.error('Error generating plan:', error);
         } finally {
             setIsGenerating(false);
-            setGeneratingDay(null);
         }
     };
 
@@ -208,9 +211,7 @@ const MealPlanner: React.FC<MealPlannerProps> = ({ user }) => {
                 <div className="bg-gradient-to-br from-nutri-50 to-emerald-50 rounded-2xl p-8 text-center mb-8 border border-nutri-100">
                     <Loader2 size={48} className="animate-spin text-nutri-500 mx-auto mb-4" />
                     <h3 className="text-lg font-bold text-gray-800 mb-2">Gerando seu plano semanal...</h3>
-                    <p className="text-gray-600">
-                        {generatingDay ? `Criando refeições para ${generatingDay}` : 'Preparando...'}
-                    </p>
+                    <p className="text-gray-600">Isso pode levar alguns segundos.</p>
                 </div>
             )}
 

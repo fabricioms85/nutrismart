@@ -45,6 +45,23 @@ export async function getExercises(userId: string, date?: string): Promise<Exerc
     return data ? data.map(mapToExercise) : [];
 }
 
+/** Returns all exercises between dateFrom and dateTo (inclusive). Used for period totals (e.g. Progress). */
+export async function getExercisesInPeriod(userId: string, dateFrom: string, dateTo: string): Promise<Exercise[]> {
+    const { data, error } = await supabase
+        .from(TABLE_EXERCISES)
+        .select('*')
+        .eq('user_id', userId)
+        .gte('date', dateFrom)
+        .lte('date', dateTo)
+        .order('date', { ascending: true });
+
+    if (error) {
+        console.error('Error fetching exercises in period:', error);
+        return [];
+    }
+    return data ? data.map(mapToExercise) : [];
+}
+
 export async function addExercise(userId: string, exercise: Omit<Exercise, 'id'>): Promise<Exercise | null> {
     const dbRow = mapToDBExercise(exercise);
     const { data, error } = await supabase
@@ -54,8 +71,7 @@ export async function addExercise(userId: string, exercise: Omit<Exercise, 'id'>
         .single();
 
     if (error) {
-        console.error('Error adding exercise:', error);
-        return null;
+        throw new Error(`Falha ao adicionar exercício: ${error.message}`);
     }
     return mapToExercise(data);
 }
@@ -68,8 +84,7 @@ export async function updateExercise(exerciseId: string, updates: Partial<Exerci
         .eq('id', exerciseId);
 
     if (error) {
-        console.error('Error updating exercise:', error);
-        return false;
+        throw new Error(`Falha ao atualizar exercício: ${error.message}`);
     }
     return true;
 }
@@ -81,8 +96,7 @@ export async function deleteExercise(exerciseId: string): Promise<boolean> {
         .eq('id', exerciseId);
 
     if (error) {
-        console.error('Error deleting exercise:', error);
-        return false;
+        throw new Error(`Falha ao excluir exercício: ${error.message}`);
     }
     return true;
 }

@@ -154,6 +154,34 @@ export function getWeekDates(startDate?: Date): { date: string; dayName: string 
     return days;
 }
 
+// Prefixes to remove for canonical name (evita "peito de frango" e "frango" separados)
+const INGREDIENT_NAME_PREFIXES = [
+    'peito de ', 'file de ', 'filé de ', 'filé ', 'cubos de ', 'fatias de ',
+    'pedaços de ', 'grãos de ', 'grão de ', 'pedaço de ', 'lascas de '
+];
+
+function normalizeIngredientName(name: string): string {
+    let s = name.toLowerCase().trim();
+    for (const prefix of INGREDIENT_NAME_PREFIXES) {
+        if (s.startsWith(prefix)) {
+            s = s.slice(prefix.length).trim();
+            break;
+        }
+    }
+    return s || name.toLowerCase().trim();
+}
+
+// Unifica "g"/"gramas", "ml"/"mililitros" etc para somar quantidades
+function normalizeUnit(unit: string): string {
+    const u = (unit || '').toLowerCase().trim();
+    if (['g', 'gramas', 'grama', 'gr'].includes(u)) return 'g';
+    if (['ml', 'mililitros', 'mililitro', 'mls'].includes(u)) return 'ml';
+    if (['un', 'unidade', 'unidades'].includes(u)) return 'un';
+    if (['xícara', 'xícaras', 'xicara', 'xicaras'].includes(u)) return 'xícara';
+    if (['colher', 'colheres', 'colher de sopa', 'colheres de sopa'].includes(u)) return 'colher';
+    return u || 'g';
+}
+
 // Categorize ingredient
 function categorizeIngredient(ingredient: string): ShoppingItem['category'] {
     const lower = ingredient.toLowerCase();
@@ -176,42 +204,46 @@ function categorizeIngredient(ingredient: string): ShoppingItem['category'] {
     return 'outros';
 }
 
-// Generate shopping list from week plan
+// Generate shopping list from week plan (unifica ingredientes iguais na mesma linha)
 export function generateShoppingList(plan: WeekPlan): ShoppingItem[] {
-    const ingredientMap = new Map<string, { quantity: number; unit: string }>();
+    const ingredientMap = new Map<string, { quantity: number; unit: string; displayName: string }>();
 
-    // Aggregate all ingredients
     plan.days.forEach(day => {
         day.meals.forEach(meal => {
             meal.ingredients?.forEach(ing => {
-                const key = ing.name.toLowerCase();
-                const qty = parseFloat(ing.quantity) || 1;
+                const canonicalName = normalizeIngredientName(ing.name);
+                const normalizedUnit = normalizeUnit(ing.unit);
+                const qty = parseFloat(String(ing.quantity).replace(',', '.')) || 1;
+                const key = `${canonicalName}::${normalizedUnit}`;
 
                 if (ingredientMap.has(key)) {
                     const existing = ingredientMap.get(key)!;
                     existing.quantity += qty;
                 } else {
-                    ingredientMap.set(key, { quantity: qty, unit: ing.unit });
+                    const displayName = canonicalName.charAt(0).toUpperCase() + canonicalName.slice(1);
+                    ingredientMap.set(key, { quantity: qty, unit: normalizedUnit, displayName });
                 }
             });
         });
     });
 
-    // Convert to shopping list
     const items: ShoppingItem[] = [];
     ingredientMap.forEach((value, key) => {
+        const [canonicalName] = key.split('::');
         items.push({
-            ingredient: key.charAt(0).toUpperCase() + key.slice(1),
+            ingredient: value.displayName,
             quantity: Math.ceil(value.quantity),
             unit: value.unit,
-            category: categorizeIngredient(key),
+            category: categorizeIngredient(canonicalName),
             checked: false,
         });
     });
 
-    // Sort by category
     const categoryOrder: ShoppingItem['category'][] = ['proteina', 'vegetal', 'fruta', 'carboidrato', 'laticinio', 'tempero', 'outros'];
-    items.sort((a, b) => categoryOrder.indexOf(a.category) - categoryOrder.indexOf(b.category));
+    items.sort((a, b) => {
+        const cat = categoryOrder.indexOf(a.category) - categoryOrder.indexOf(b.category);
+        return cat !== 0 ? cat : a.ingredient.localeCompare(b.ingredient);
+    });
 
     return items;
 }

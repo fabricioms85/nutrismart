@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { Analytics } from '@vercel/analytics/react';
 import App from './App';
 import ErrorBoundary from './components/ErrorBoundary';
 import { ToastProvider } from './contexts/ToastContext';
@@ -20,6 +21,7 @@ root.render(
     <ErrorBoundary>
       <ToastProvider>
         <App />
+        <Analytics />
       </ToastProvider>
     </ErrorBoundary>
   </React.StrictMode>

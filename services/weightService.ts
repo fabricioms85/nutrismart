@@ -52,8 +52,7 @@ export async function addWeightEntry(userId: string, weight: number, date: strin
         .insert({ user_id: userId, weight, date, notes: note });
 
     if (error) {
-        console.error('Error adding weight entry:', error);
-        return false;
+        throw new Error(`Falha ao adicionar registro de peso: ${error.message}`);
     }
     return true;
 }
@@ -68,11 +67,9 @@ export async function getLatestWeight(userId: string): Promise<number | null> {
         .single();
 
     if (error) {
-        // It's common to not have a weight history yet, so just return null without error log if it's PGRST116 (0 rows)
-        if (error.code !== 'PGRST116') {
-            console.error('Error fetching latest weight:', error);
-        }
-        return null;
+        // PGRST116 = nenhuma linha encontrada (usuário ainda não tem histórico de peso) - retorno null esperado
+        if (error.code === 'PGRST116') return null;
+        throw new Error(`Falha ao buscar último peso: ${error.message}`);
     }
     return data?.weight || null;
 }
