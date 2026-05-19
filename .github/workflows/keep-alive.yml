@@ -2,15 +2,22 @@ name: Supabase Keep-Alive
 
 on:
   schedule:
-    - cron: '0 0 */5 * *' # Executes every 5 days at 00:00 UTC
-  workflow_dispatch: # Allows manual execution from the Actions tab
+    - cron: '0 0 */3 * *' # Executa a cada 3 dias às 00:00 UTC
+  workflow_dispatch: # Permite execução manual a partir da aba Actions
 
 jobs:
   ping-supabase:
     runs-on: ubuntu-latest
     steps:
-      - name: Send Ping to Supabase API
+      - name: Send Ping to Supabase Database (Profiles Table)
         run: |
-          curl -I -X GET "${{ secrets.SUPABASE_URL }}/rest/v1/" \
-          -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
-          -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}"
+          response=$(curl -s -o /dev/null -w "%{http_code}" -X GET "${{ secrets.SUPABASE_URL }}/rest/v1/profiles?select=id&limit=1" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}")
+          
+          if [ "$response" -eq 200 ]; then
+            echo "✅ Supabase project is active and responding. HTTP Status: $response"
+          else
+            echo "❌ Failed to query database table. HTTP Status: $response"
+            exit 1
+          fi
