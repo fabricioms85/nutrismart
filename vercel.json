@@ -4,6 +4,12 @@
     "buildCommand": "npm run build",
     "outputDirectory": "dist",
     "installCommand": "npm install",
+    "crons": [
+        {
+            "path": "/api/keepalive",
+            "schedule": "0 10 * * *"
+        }
+    ],
     "rewrites": [
         {
             "source": "/((?!api/).*)",
