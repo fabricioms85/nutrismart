@@ -2,22 +2,40 @@ name: Supabase Keep-Alive
 
 on:
   schedule:
-    - cron: '0 0 */3 * *' # Executa a cada 3 dias às 00:00 UTC
+    - cron: '0 0 * * *' # Executa TODOS OS DIAS às 00:00 UTC
   workflow_dispatch: # Permite execução manual a partir da aba Actions
 
 jobs:
   ping-supabase:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - name: Send Ping to Supabase Database (Profiles Table)
+      - uses: actions/checkout@v4
+      
+      - name: Send Ping to Supabase Database
         run: |
-          response=$(curl -s -o /dev/null -w "%{http_code}" -X GET "${{ secrets.SUPABASE_URL }}/rest/v1/profiles?select=id&limit=1" \
-            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}")
+          # Usando URL e KEY diretamente para evitar erros caso os Secrets não tenham sido configurados no GitHub
+          URL="https://sjykgqmmwlhbehjwhsut.supabase.co"
+          KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNqeWtncW1td2xoYmVoandoc3V0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkyNTkzMDEsImV4cCI6MjA4NDgzNTMwMX0.xEd3WpzRLezDH9xPtfHHkP0hg7GRbwqfKR0cxopVvmY"
           
-          if [ "$response" -eq 200 ]; then
-            echo "✅ Supabase project is active and responding. HTTP Status: $response"
+          response=$(curl -s -w "\n%{http_code}" -X GET "$URL/rest/v1/profiles?select=id&limit=1" \
+            -H "apikey: $KEY" \
+            -H "Authorization: Bearer $KEY")
+          
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+          
+          echo "Response Body: $body"
+          
+          if [ "$http_code" -eq 200 ]; then
+            echo "✅ Supabase project is active and responding. HTTP Status: $http_code"
           else
-            echo "❌ Failed to query database table. HTTP Status: $response"
+            echo "❌ Failed to query database table. HTTP Status: $http_code"
             exit 1
           fi
+
+      - name: Keep GitHub Actions Alive
+        uses: gautamkrishnar/keepalive-workflow@v2
+        with:
+          commit_message: "chore: auto-keepalive to prevent GitHub Actions from suspending cron"
